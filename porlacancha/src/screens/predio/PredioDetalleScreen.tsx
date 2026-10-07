@@ -279,10 +279,7 @@ export function PredioDetalleScreen({
         onArmarPlus(turnoId);
         return;
       }
-      showNotice(
-        "Reserva Plus",
-        "La configuración completa del partido Plus llega en la próxima fase. Por ahora usá Armar partido desde el botón +."
-      );
+      showNotice("Reserva Plus", "No se pudo abrir el armado Plus. Probá de nuevo desde el botón +.");
       return;
     }
     if (!tipo || !acepto) {
@@ -660,8 +657,8 @@ export function PredioDetalleScreen({
               <View style={[styles.emptyBox, { marginTop: space[12] }]}>
                 <Text style={styles.emptyT}>Configurás el partido en el próximo paso</Text>
                 <Mute>
-                  Modo, categoría, equipo, lugares libres y cómo pagan los que se suman. Tocá Continuar para seguir
-                  (por ahora abrimos el armado de partido con este turno).
+                  Modo, equipo, lugares libres y regla de empate. Tocá Continuar para armar el partido Plus con este
+                  turno.
                 </Mute>
               </View>
             ) : null}

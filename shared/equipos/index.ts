@@ -24,6 +24,8 @@ export {
   rpcSolicitarIngresoPorToken,
   rpcTransferirCapitania,
   rpcCrearPartido,
+  rpcCotizarReservaPlus,
+  rpcPasarAPlus,
   rpcInscribirJugadorAmistoso,
   rpcConfirmarPagoPrueba,
   rpcMontoAPagarInscripcion,

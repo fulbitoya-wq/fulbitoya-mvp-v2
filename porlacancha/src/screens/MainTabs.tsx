@@ -50,8 +50,10 @@ import { InicioScreen } from "./inicio/InicioScreen";
 import { PredioDetalleScreen } from "./predio/PredioDetalleScreen";
 import { ReservarCanchaScreen } from "./ReservarCanchaScreen";
 import { ReservaListaScreen } from "./ReservaListaScreen";
+import { ReservaPlusWizard } from "./reserva/ReservaPlusWizard";
 import { ChevronLeft, iconStroke } from "../lib/icons";
 import type { SearchPlayer } from "../lib/player-search";
+import type { ReservaDraft } from "../lib/reserva-draft";
 
 type Tab = "explore" | "matches" | "teams" | "profile";
 type ExploreView = "hub" | "partidos" | "reservar" | "predio";
@@ -93,6 +95,7 @@ export function MainTabs({ onRequestAuth }: Props) {
   const [plusSearch, setPlusSearch] = useState(false);
   const [plusPlayer, setPlusPlayer] = useState<SearchPlayer | null>(null);
   const [crearPartidoOpen, setCrearPartidoOpen] = useState(false);
+  const [reservaPlus, setReservaPlus] = useState<Partial<ReservaDraft> | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [listaReservaId, setListaReservaId] = useState<string | null>(null);
   const [completarReservaId, setCompletarReservaId] = useState<string | null>(null);
@@ -351,7 +354,16 @@ export function MainTabs({ onRequestAuth }: Props) {
         return;
       }
       if (action.kind === "crear_partido") {
-        setCrearPartidoOpen(true);
+        setReservaPlus({ kind: "plus" });
+        return;
+      }
+      if (action.kind === "reserva_plus") {
+        setReservaPlus({
+          kind: "plus",
+          canchaId: action.canchaId,
+          turnoId: action.turnoId,
+          fromReservaId: action.fromReservaId,
+        });
         return;
       }
       if (action.kind === "lista_reserva") {
@@ -531,6 +543,33 @@ export function MainTabs({ onRequestAuth }: Props) {
               });
             }}
           />
+        ) : reservaPlus ? (
+          <ReservaPlusWizard
+            captainTeams={equiposDondeEsCapitan(equipos)}
+            initial={reservaPlus}
+            loggedIn={loggedIn}
+            onRequestAuth={onRequestAuth}
+            onBack={() => setReservaPlus(null)}
+            onCreateTeam={() => {
+              setReservaPlus(null);
+              void queueOrRun({ kind: "create_team" }, () => {
+                setTeamsView({ name: "create" });
+                setTab("teams");
+              });
+            }}
+            onCreated={(desafioId) => {
+              setReservaPlus(null);
+              setReservePrefill(null);
+              setExploreView("hub");
+              void refreshDesafios().then(async (list) => {
+                const d = list.find((x) => x.id === desafioId) ?? (await getDesafioPorId(desafioId));
+                if (d) {
+                  setDetalle(d);
+                  setSelectedId(d.id);
+                }
+              });
+            }}
+          />
         ) : crearPartidoOpen ? (
           <CrearPartidoScreen
             captainTeams={equiposDondeEsCapitan(equipos)}
@@ -634,6 +673,12 @@ export function MainTabs({ onRequestAuth }: Props) {
                 setCalendarOpen(false);
                 void startInscribir(d);
               }}
+              onPasarAPlus={(reservaId) => {
+                setCalendarOpen(false);
+                void queueOrRun({ kind: "reserva_plus", fromReservaId: reservaId }, () =>
+                  setReservaPlus({ kind: "plus", fromReservaId: reservaId })
+                );
+              }}
             />
           </View>
         ) : tab === "matches" ? (
@@ -698,8 +743,11 @@ export function MainTabs({ onRequestAuth }: Props) {
             onRequestAuth={onRequestAuth}
             onOpenDesafio={openDesafio}
             onArmarPlus={(turnoId) => {
-              setReservePrefill((prev) => (prev ? { ...prev, turnoId } : prev));
-              setCrearPartidoOpen(true);
+              const canchaId = reservePrefill?.canchaId;
+              void queueOrRun(
+                { kind: "reserva_plus", canchaId, turnoId },
+                () => setReservaPlus({ kind: "plus", canchaId, turnoId })
+              );
             }}
             onDone={() => {
               setReservePrefill(null);
@@ -738,7 +786,7 @@ export function MainTabs({ onRequestAuth }: Props) {
               setExploreView("reservar");
             }}
             onArmar={() => {
-              void queueOrRun({ kind: "crear_partido" }, () => setCrearPartidoOpen(true));
+              void queueOrRun({ kind: "reserva_plus" }, () => setReservaPlus({ kind: "plus" }));
             }}
             onOpenDesafio={openDesafio}
             onVerPartidos={() => {
@@ -771,6 +819,7 @@ export function MainTabs({ onRequestAuth }: Props) {
       !calendarOpen &&
       !listaReservaId &&
       !crearPartidoOpen &&
+      !reservaPlus &&
       exploreView !== "reservar" &&
       exploreView !== "predio" &&
       !plusSearch &&
@@ -819,7 +868,7 @@ export function MainTabs({ onRequestAuth }: Props) {
         }}
         onArmarPartido={() => {
           setPlusOpen(false);
-          void queueOrRun({ kind: "crear_partido" }, () => setCrearPartidoOpen(true));
+          void queueOrRun({ kind: "reserva_plus" }, () => setReservaPlus({ kind: "plus" }));
         }}
         onCompletarPartido={
           completarReservaId

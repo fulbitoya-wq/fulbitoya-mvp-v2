@@ -42,6 +42,8 @@ type Props = {
   onRequestAuth: () => void;
   onOpenDesafio: (d: Desafio) => void;
   onEditarConvocados: (d: Desafio) => void;
+  /** Fase 3: pasar una reserva simple a Plus. */
+  onPasarAPlus?: (reservaId: string) => void;
 };
 
 function rolLabel(p: MiPartido): string {
@@ -50,7 +52,13 @@ function rolLabel(p: MiPartido): string {
   return "Plantel";
 }
 
-export function MisPartidosScreen({ guest, onRequestAuth, onOpenDesafio, onEditarConvocados }: Props) {
+export function MisPartidosScreen({
+  guest,
+  onRequestAuth,
+  onOpenDesafio,
+  onEditarConvocados,
+  onPasarAPlus,
+}: Props) {
   const [tab, setTab] = useState<Tab>("proximos");
   const [items, setItems] = useState<MiPartido[]>([]);
   const [reservas, setReservas] = useState<ReservaMia[]>([]);
@@ -158,29 +166,36 @@ export function MisPartidosScreen({ guest, onRequestAuth, onOpenDesafio, onEdita
                       ? " · por WhatsApp · se paga en el predio"
                       : ` · ${pesosReserva(r.monto_total)}${r.tipo_cobro === "total" ? " · total" : " · seña"}`}
                   </Mute>
-                  <Pressable
-                    onPress={() => {
-                      showConfirm({
-                        title: "Cancelar reserva",
-                        body: "Se aplica la regla de cancelación del predio (congelada al pagar).",
-                        cancelLabel: "Volver",
-                        confirmLabel: "Cancelar reserva",
-                        danger: true,
-                        onConfirm: () => {
-                          void cancelarReservaMia(r.id).then((res) => {
-                            if (!res.ok) {
-                              showNotice("No se pudo cancelar", res.error);
-                              return;
-                            }
-                            void load();
-                          });
-                        },
-                      });
-                    }}
-                    style={styles.linkHit}
-                  >
-                    <Text style={styles.danger}>Cancelar reserva</Text>
-                  </Pressable>
+                  <View style={styles.actions}>
+                    {onPasarAPlus && r.canal !== "whatsapp" ? (
+                      <Pressable onPress={() => onPasarAPlus(r.id)} style={styles.linkHit}>
+                        <Text style={styles.link}>Pasar a Plus</Text>
+                      </Pressable>
+                    ) : null}
+                    <Pressable
+                      onPress={() => {
+                        showConfirm({
+                          title: "Cancelar reserva",
+                          body: "Se aplica la regla de cancelación del predio (congelada al pagar).",
+                          cancelLabel: "Volver",
+                          confirmLabel: "Cancelar reserva",
+                          danger: true,
+                          onConfirm: () => {
+                            void cancelarReservaMia(r.id).then((res) => {
+                              if (!res.ok) {
+                                showNotice("No se pudo cancelar", res.error);
+                                return;
+                              }
+                              void load();
+                            });
+                          },
+                        });
+                      }}
+                      style={styles.linkHit}
+                    >
+                      <Text style={styles.danger}>Cancelar reserva</Text>
+                    </Pressable>
+                  </View>
                 </View>
               ))}
           </View>

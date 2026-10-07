@@ -4,6 +4,7 @@ import {
   rpcCondicionesDeDesafio,
   rpcConfirmarPagoPrueba,
   rpcCorrerTareaPeriodicaPlc,
+  rpcCotizarReservaPlus,
   rpcCrearPartido,
   rpcDecidirSinRival,
   rpcGetRelojPlc,
@@ -11,12 +12,14 @@ import {
   rpcListarTurnosPublicos,
   rpcMontoAPagarInscripcion,
   rpcOpcionesSinRival,
+  rpcPasarAPlus,
   rpcSetRelojSimulacion,
 } from "@shared/equipos";
 import { formatPremio } from "./desafios";
+import type { ReservaBusca } from "./reserva-draft";
 import { supabase } from "./supabase";
 
-export type PlcModalidad = "por_la_cancha" | "amistoso";
+export type PlcModalidad = "por_la_cancha" | "amistoso" | "competitivo";
 export type PlcReglaEmpate = "penales" | "mitad_cada_uno";
 
 export type TurnoPublico = {
@@ -72,7 +75,67 @@ export function pesos(v: unknown): string {
 }
 
 export function etiquetaModalidadPlc(modalidad: string | null | undefined): string {
-  return modalidad === "amistoso" ? "Amistoso" : "Por la cancha";
+  if (modalidad === "amistoso") return "Amistoso";
+  if (modalidad === "competitivo") return "Competitivo";
+  return "Por la cancha";
+}
+
+export type CotizacionPlus = {
+  modalidad: string;
+  tipo_cobro: string;
+  precio_cancha: number;
+  monto_cancha: number;
+  tarifa_plus: number;
+  monto_pagar_ahora: number;
+  resta_en_predio: number;
+  texto_cancelacion: string;
+  texto_reglas: string;
+  cancha_nombre: string;
+  campo_nombre: string;
+  fecha: string;
+  hora_inicio: string;
+  formato: string;
+  slug: string | null;
+  aclaracion_tarifa: string;
+};
+
+function mapCotPlus(res: Record<string, unknown>): CotizacionPlus {
+  return {
+    modalidad: str(res.modalidad),
+    tipo_cobro: str(res.tipo_cobro),
+    precio_cancha: num(res.precio_cancha) ?? 0,
+    monto_cancha: num(res.monto_cancha) ?? 0,
+    tarifa_plus: num(res.tarifa_plus) ?? 0,
+    monto_pagar_ahora: num(res.monto_pagar_ahora) ?? 0,
+    resta_en_predio: num(res.resta_en_predio) ?? 0,
+    texto_cancelacion: str(res.texto_cancelacion),
+    texto_reglas: str(res.texto_reglas),
+    cancha_nombre: str(res.cancha_nombre),
+    campo_nombre: str(res.campo_nombre),
+    fecha: str(res.fecha),
+    hora_inicio: str(res.hora_inicio),
+    formato: str(res.formato),
+    slug: res.slug == null || str(res.slug) === "" ? null : str(res.slug),
+    aclaracion_tarifa: str(res.aclaracion_tarifa) || "Si no se suma nadie por la app, te devolvemos la tarifa",
+  };
+}
+
+export async function cotizarReservaPlus(input: {
+  disponibilidadId: string;
+  modalidad: PlcModalidad;
+  libres: number;
+  busca: ReservaBusca;
+  tipoCobro?: "sena" | "total";
+}) {
+  const res = await rpcCotizarReservaPlus(supabase, {
+    disponibilidadId: input.disponibilidadId,
+    modalidad: input.modalidad,
+    libres: input.libres,
+    busca: input.busca,
+    tipoCobro: input.tipoCobro ?? "total",
+  });
+  if (!res.ok) return { ok: false as const, error: err(res.error) };
+  return { ok: true as const, cot: mapCotPlus(res) };
 }
 
 export async function listarTurnosPublicos(): Promise<{ data: TurnoPublico[]; error: string | null }> {
@@ -100,7 +163,8 @@ export async function listarTurnosPublicos(): Promise<{ data: TurnoPublico[]; er
 }
 
 export async function calcularCondiciones(turnoId: string, modalidad: PlcModalidad) {
-  const res = await rpcCalcularCondiciones(supabase, turnoId, modalidad);
+  const mod = modalidad === "competitivo" ? "amistoso" : modalidad;
+  const res = await rpcCalcularCondiciones(supabase, turnoId, mod);
   if (!res.ok) return { ok: false as const, error: err(res.error) };
   return { ok: true as const, cond: res as Record<string, unknown> };
 }
@@ -134,6 +198,8 @@ export async function crearPartidoPlc(input: {
   convocados: string[];
   reglaEmpate: PlcReglaEmpate;
   modalidad: PlcModalidad;
+  libres?: number;
+  busca?: ReservaBusca;
 }) {
   const res = await rpcCrearPartido(supabase, input);
   if (!res.ok) {
@@ -148,6 +214,42 @@ export async function crearPartidoPlc(input: {
     desafioId: res.desafio_id,
     inscripcionId: res.inscripcion_id,
     montoTotal: res.monto_total ?? 0,
+    tarifaPlus: res.tarifa_plus ?? 0,
+  };
+}
+
+export async function pasarAPlusPlc(input: {
+  reservaId: string;
+  equipoId: string;
+  convocados: string[];
+  modalidad: PlcModalidad;
+  reglaEmpate: PlcReglaEmpate;
+  libres?: number;
+  busca?: ReservaBusca;
+}) {
+  const res = await rpcPasarAPlus(supabase, {
+    reservaId: input.reservaId,
+    equipoId: input.equipoId,
+    convocados: input.convocados,
+    modalidad: input.modalidad,
+    reglaEmpate: input.reglaEmpate,
+    libres: input.libres,
+    busca: input.busca,
+  });
+  if (!res.ok) {
+    return {
+      ok: false as const,
+      error: mensajeErrorEquipo(res.error, { minimo: res.minimo, quienes: res.quienes }),
+      code: res.error,
+    };
+  }
+  return {
+    ok: true as const,
+    desafioId: str(res.desafio_id),
+    inscripcionId: str(res.inscripcion_id),
+    montoTotal: num(res.monto_total) ?? num(res.monto_upgrade) ?? 0,
+    tarifaPlus: num(res.tarifa_plus) ?? num(res.monto_servicio) ?? 0,
+    faltaCancha: num(res.falta_cancha) ?? 0,
   };
 }
 

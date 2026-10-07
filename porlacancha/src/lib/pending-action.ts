@@ -20,6 +20,12 @@ export type PendingAction =
       acepto?: boolean;
     }
   | { kind: "crear_partido" }
+  | {
+      kind: "reserva_plus";
+      canchaId?: string;
+      turnoId?: string;
+      fromReservaId?: string;
+    }
   | { kind: "lista_reserva"; reservaId: string }
   | { kind: "open_desafio"; desafioId: string }
   | { kind: "open_predio"; slug: string };

@@ -59,7 +59,7 @@ export const EQUIPOS_RPC_ERRORS: Record<string, string> = {
   no_auto: "Eso no aplica a tu propia cuenta.",
   cupo_lleno: "Ya no hay lugar en este desafío.",
   no_activa: "Esa inscripción ya no está activa.",
-  fuera_de_plazo: "Ya no se puede cancelar: pasó el plazo.",
+  fuera_de_plazo: "Ya no se puede: pasó el plazo.",
   desafios_no_habilitados: "Este predio no admite desafíos en esa cancha.",
   horario_no_habilitado: "Ese horario no está habilitado para desafíos.",
   anticipacion_insuficiente: "Hay que publicar con más anticipación para ese formato.",

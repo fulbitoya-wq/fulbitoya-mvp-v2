@@ -215,15 +215,19 @@ export async function rpcCrearPartido(
     equipoId: string;
     convocados: string[];
     reglaEmpate: "penales" | "mitad_cada_uno";
-    modalidad: "por_la_cancha" | "amistoso";
+    modalidad: "por_la_cancha" | "amistoso" | "competitivo";
+    libres?: number;
+    busca?: string;
   }
-): Promise<RpcResult<{ desafio_id: string; inscripcion_id: string; monto_total?: number }>> {
+): Promise<RpcResult<{ desafio_id: string; inscripcion_id: string; monto_total?: number; tarifa_plus?: number }>> {
   const res = await call(client, "crear_partido", {
     p_disponibilidad_id: input.disponibilidadId,
     p_equipo_id: input.equipoId,
     p_convocados: input.convocados,
     p_regla_empate: input.reglaEmpate,
     p_modalidad: input.modalidad,
+    p_libres: input.libres ?? null,
+    p_busca: input.busca ?? null,
   });
   if (!res.ok) return res;
   return {
@@ -231,7 +235,50 @@ export async function rpcCrearPartido(
     desafio_id: String(res.desafio_id ?? ""),
     inscripcion_id: String(res.inscripcion_id ?? ""),
     monto_total: typeof res.monto_total === "number" ? res.monto_total : Number(res.monto_total ?? 0),
+    tarifa_plus: typeof res.tarifa_plus === "number" ? res.tarifa_plus : Number(res.tarifa_plus ?? 0),
   };
+}
+
+export async function rpcCotizarReservaPlus(
+  client: EquiposRpcClient,
+  input: {
+    disponibilidadId: string;
+    modalidad: string;
+    libres: number;
+    busca: string;
+    tipoCobro?: "sena" | "total";
+  }
+): Promise<RpcResult<Record<string, unknown>>> {
+  return call(client, "plc_cotizar_reserva_plus", {
+    p_disponibilidad_id: input.disponibilidadId,
+    p_modalidad: input.modalidad,
+    p_libres: input.libres,
+    p_busca: input.busca,
+    p_tipo_cobro: input.tipoCobro ?? "total",
+  });
+}
+
+export async function rpcPasarAPlus(
+  client: EquiposRpcClient,
+  input: {
+    reservaId: string;
+    equipoId: string;
+    convocados: string[];
+    modalidad: string;
+    reglaEmpate: "penales" | "mitad_cada_uno";
+    libres?: number;
+    busca?: string;
+  }
+): Promise<RpcResult<Record<string, unknown>>> {
+  return call(client, "plc_pasar_a_plus", {
+    p_reserva_id: input.reservaId,
+    p_equipo_id: input.equipoId,
+    p_convocados: input.convocados,
+    p_modalidad: input.modalidad,
+    p_regla_empate: input.reglaEmpate,
+    p_libres: input.libres ?? 0,
+    p_busca: input.busca ?? "ambos",
+  });
 }
 
 export async function rpcInscribirJugadorAmistoso(
