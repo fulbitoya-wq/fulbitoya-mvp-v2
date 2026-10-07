@@ -348,6 +348,13 @@ export async function rpcListarPrediosPublicos(
   return { ok: true, predios: Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [] };
 }
 
+export async function rpcDetallePredio(
+  client: EquiposRpcClient,
+  canchaId: string
+): Promise<RpcResult<Record<string, unknown>>> {
+  return call(client, "plc_detalle_predio", { p_cancha_id: canchaId });
+}
+
 export async function rpcCotizarReserva(
   client: EquiposRpcClient,
   disponibilidadId: string,

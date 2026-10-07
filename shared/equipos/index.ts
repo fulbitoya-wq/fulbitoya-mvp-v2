@@ -53,6 +53,7 @@ export {
   rpcCotizarEnlacePago,
   rpcIniciarCheckoutEnlace,
   rpcPredioPublico,
+  rpcDetallePredio,
   rpcSlugDeCancha,
   rpcGuardarListaReserva,
   rpcListarListaReserva,

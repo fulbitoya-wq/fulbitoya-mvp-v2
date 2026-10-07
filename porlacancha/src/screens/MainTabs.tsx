@@ -45,13 +45,14 @@ import { PlayersSearchScreen } from "./jugadores/PlayersSearchScreen";
 import { PlayerPublicProfileScreen } from "./jugadores/PlayerPublicProfileScreen";
 import { CrearPartidoScreen } from "./CrearPartidoScreen";
 import { InicioScreen } from "./inicio/InicioScreen";
+import { PredioDetalleScreen } from "./predio/PredioDetalleScreen";
 import { ReservarCanchaScreen } from "./ReservarCanchaScreen";
 import { ReservaListaScreen } from "./ReservaListaScreen";
 import { ChevronLeft, iconStroke } from "../lib/icons";
 import type { SearchPlayer } from "../lib/player-search";
 
 type Tab = "explore" | "matches" | "teams" | "profile";
-type ExploreView = "hub" | "partidos" | "reservar";
+type ExploreView = "hub" | "partidos" | "reservar" | "predio";
 type TeamsView =
   | { name: "list" }
   | { name: "create" }
@@ -335,7 +336,7 @@ export function MainTabs({ onRequestAuth }: Props) {
           tipoCobro: action.tipoCobro,
           acepto: action.acepto,
         });
-        setExploreView("reservar");
+        setExploreView(action.canchaId ? "predio" : "reservar");
         setTab("explore");
         return;
       }
@@ -377,8 +378,8 @@ export function MainTabs({ onRequestAuth }: Props) {
       const canchaId = typeof predio.id === "string" ? predio.id : "";
       if (!canchaId) return;
       setTab("explore");
-      setExploreView("reservar");
       setReservePrefill({ canchaId });
+      setExploreView("predio");
     };
     void openLaunch();
     return () => {
@@ -671,6 +672,25 @@ export function MainTabs({ onRequestAuth }: Props) {
           />
         ) : tab === "teams" ? (
           teamsBody()
+        ) : exploreView === "predio" && reservePrefill?.canchaId ? (
+          <PredioDetalleScreen
+            canchaId={reservePrefill.canchaId}
+            initialTurnoId={reservePrefill.turnoId ?? null}
+            initialTipoCobro={reservePrefill.tipoCobro ?? null}
+            initialAcepto={reservePrefill.acepto ?? false}
+            partidos={items}
+            onBack={() => {
+              setReservePrefill(null);
+              setExploreView("hub");
+            }}
+            onRequestAuth={onRequestAuth}
+            onOpenDesafio={openDesafio}
+            onDone={() => {
+              setReservePrefill(null);
+              setExploreView("hub");
+              setTab("explore");
+            }}
+          />
         ) : exploreView === "reservar" ? (
           <ReservarCanchaScreen
             onBack={() => {
@@ -713,9 +733,13 @@ export function MainTabs({ onRequestAuth }: Props) {
               if (needAuth()) return;
               setCalendarOpen(true);
             }}
+            onOpenPredio={(canchaId) => {
+              setReservePrefill({ canchaId });
+              setExploreView("predio");
+            }}
             onReservarTurno={(canchaId, turnoId) => {
               setReservePrefill({ canchaId, turnoId });
-              setExploreView("reservar");
+              setExploreView("predio");
             }}
             onRequestAuth={onRequestAuth}
             onOpenZona={() => {
@@ -732,6 +756,7 @@ export function MainTabs({ onRequestAuth }: Props) {
       !listaReservaId &&
       !crearPartidoOpen &&
       exploreView !== "reservar" &&
+      exploreView !== "predio" &&
       !plusSearch &&
       !plusPlayer &&
       !hideProfileNav &&

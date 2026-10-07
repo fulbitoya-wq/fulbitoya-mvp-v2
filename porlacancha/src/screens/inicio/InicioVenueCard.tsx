@@ -12,6 +12,7 @@ type Props = {
   distancia: string | null;
   detalles: string;
   hours: InicioTurnoChip[];
+  onPressVenue?: () => void;
   onPressHour: (turnoId: string) => void;
 };
 
@@ -21,27 +22,37 @@ export function InicioVenueCard({
   distancia,
   detalles,
   hours,
+  onPressVenue,
   onPressHour,
 }: Props) {
   return (
     <View style={styles.card}>
-      <View style={styles.photo} />
-      <View style={styles.body}>
-        <View style={styles.titleRow}>
-          <Text style={styles.name} numberOfLines={1}>
-            {nombre}
-          </Text>
-          {distancia ? <Text style={styles.dist}>{distancia}</Text> : null}
-        </View>
-        {ubicacion ? (
-          <View style={styles.placeRow}>
-            <MapPin color={colors.sky} size={13} strokeWidth={iconStroke} />
-            <Text style={styles.zona} numberOfLines={2}>
-              {ubicacion}
+      <Pressable
+        onPress={onPressVenue}
+        disabled={!onPressVenue}
+        accessibilityRole={onPressVenue ? "button" : undefined}
+        style={styles.mainHit}
+      >
+        <View style={styles.photo} />
+        <View style={styles.bodyTop}>
+          <View style={styles.titleRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {nombre}
             </Text>
+            {distancia ? <Text style={styles.dist}>{distancia}</Text> : null}
           </View>
-        ) : null}
-        {detalles ? <Text style={styles.tipos}>{detalles}</Text> : null}
+          {ubicacion ? (
+            <View style={styles.placeRow}>
+              <MapPin color={colors.sky} size={13} strokeWidth={iconStroke} />
+              <Text style={styles.zona} numberOfLines={2}>
+                {ubicacion}
+              </Text>
+            </View>
+          ) : null}
+          {detalles ? <Text style={styles.tipos}>{detalles}</Text> : null}
+        </View>
+      </Pressable>
+      <View style={styles.bodyHours}>
         <Text style={styles.sub}>Horarios disponibles</Text>
         <View style={styles.hours}>
           {hours.map((h) => (
@@ -66,7 +77,6 @@ export function InicioVenueCard({
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: "row",
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -74,8 +84,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     minHeight: 118,
   },
-  photo: { width: 92, backgroundColor: colors.navyDark },
-  body: { flex: 1, padding: space[12], gap: 4 },
+  mainHit: { flexDirection: "row" },
+  photo: { width: 92, minHeight: 92, backgroundColor: colors.navyDark },
+  bodyTop: { flex: 1, padding: space[12], gap: 4, paddingBottom: 4 },
+  bodyHours: { paddingHorizontal: space[12], paddingBottom: space[12] },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -91,7 +103,7 @@ const styles = StyleSheet.create({
   },
   zona: { flex: 1, ...typeStyle("caption", colors.textSecondary) },
   tipos: typeStyle("caption", colors.sky),
-  sub: { ...typeStyle("caption", colors.white), marginTop: 6 },
+  sub: { ...typeStyle("caption", colors.white), marginTop: 2 },
   hours: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
   hourHit: { minHeight: 48, justifyContent: "center" },
   hour: {

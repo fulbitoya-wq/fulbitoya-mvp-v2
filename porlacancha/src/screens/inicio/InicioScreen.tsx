@@ -55,6 +55,7 @@ type Props = {
   onVerPartidos: () => void;
   onVerProximos: () => void;
   onReservarTurno: (canchaId: string, turnoId: string) => void;
+  onOpenPredio: (canchaId: string) => void;
   onRequestAuth: () => void;
   onOpenZona?: () => void;
 };
@@ -86,6 +87,7 @@ export function InicioScreen({
   onVerPartidos,
   onVerProximos,
   onReservarTurno,
+  onOpenPredio,
   onRequestAuth,
   onOpenZona,
 }: Props) {
@@ -381,6 +383,7 @@ export function InicioScreen({
                   distancia={v.distancia}
                   detalles={v.detalles}
                   hours={v.hours}
+                  onPressVenue={() => onOpenPredio(v.canchaId)}
                   onPressHour={(turnoId) => onReservarTurno(v.canchaId, turnoId)}
                 />
               ))}
