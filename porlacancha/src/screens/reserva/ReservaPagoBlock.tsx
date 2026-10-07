@@ -195,7 +195,7 @@ function SummaryLine({
 const styles = StyleSheet.create({
   wrap: { marginTop: space[16], gap: space[12] },
   h: typeStyle("h3", colors.white),
-  row: { flexDirection: "row", gap: space[10] },
+  row: { flexDirection: "row", gap: space[12] },
   col: { flexDirection: "column" },
   payCard: {
     backgroundColor: colors.navyDark,
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
     padding: space[12],
-    gap: space[10],
+    gap: space[12],
   },
   rulesT: typeStyle("bodySmall", colors.white),
   rulesMuted: typeStyle("caption", colors.textSecondary),

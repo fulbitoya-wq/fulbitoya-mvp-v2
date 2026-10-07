@@ -176,8 +176,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[8],
     paddingBottom: space[8],
   },
-  title: { ...typeStyle("titleSmall", colors.cream), flex: 1, textAlign: "center" },
-  h: { ...typeStyle("titleSmall", colors.cream), marginBottom: space[4] },
+  title: { ...typeStyle("h3", colors.white), flex: 1, textAlign: "center" },
+  h: { ...typeStyle("h3", colors.white), marginBottom: space[4] },
   val: { ...typeStyle("body", colors.sky) },
   link: { ...typeStyle("bodySmall", colors.gold), textDecorationLine: "underline" },
 });
