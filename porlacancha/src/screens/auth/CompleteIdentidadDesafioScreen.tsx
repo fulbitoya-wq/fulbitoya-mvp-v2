@@ -57,8 +57,8 @@ export function CompleteIdentidadDesafioScreen({ onDone, onCancel }: Props) {
       <BrandLogo size="sm" />
       <Heading>Verificá tu identidad</Heading>
       <Lead>
-        Para crear, aceptar o pagar un desafío por la cancha necesitás ser mayor de 18 y cargar DNI y fecha de
-        nacimiento. El DNI no aparece en tu perfil ni en búsquedas.
+        Para un desafío por la cancha tenés que ser mayor de 18. Confirmá tu fecha de nacimiento y cargá el DNI.
+        El DNI no aparece en tu perfil ni en búsquedas, y después no se puede cambiar desde la app.
       </Lead>
       {error ? <ErrorText>{error}</ErrorText> : null}
       <Field

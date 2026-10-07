@@ -46,6 +46,7 @@ type Props = {
   email: string | null;
   onBack: () => void;
   onEdit: () => void;
+  onDatosPersonales: () => void;
   onPublic: () => void;
   onSignOut: () => void;
 };
@@ -83,7 +84,16 @@ function Row({
   );
 }
 
-export function ConfiguracionScreen({ profile, football, email, onBack, onEdit, onPublic, onSignOut }: Props) {
+export function ConfiguracionScreen({
+  profile,
+  football,
+  email,
+  onBack,
+  onEdit,
+  onDatosPersonales,
+  onPublic,
+  onSignOut,
+}: Props) {
   const insets = useSafeAreaInsets();
   const [panel, setPanel] = useState<Panel>("home");
   const [sheet, setSheet] = useState(false);
@@ -188,14 +198,32 @@ export function ConfiguracionScreen({ profile, football, email, onBack, onEdit, 
             <Card>
               <View style={styles.cardH}>
                 <User color={colors.gold} size={18} strokeWidth={iconStroke} />
-                <Text style={styles.h}>Datos personales</Text>
+                <Text style={styles.h}>Cuenta</Text>
               </View>
               <Row label="Nombre" value={profile.nombre?.split(" ")[0] ?? "—"} onPress={onEdit} />
               <Row label="Apellido" value={football.apellido || "—"} onPress={onEdit} />
               <Row label="Username" value={profile.username ? `@${profile.username}` : "—"} onPress={onEdit} />
               <Row label="Teléfono" value={profile.telefono ?? "—"} onPress={onEdit} />
               <Row label="Email" value={email ?? profile.email ?? "—"} onPress={onEdit} />
-              <Row label="Fecha de nacimiento" value={football.fechaNacimiento ?? "—"} onPress={onEdit} />
+            </Card>
+
+            <View style={{ height: space[16] }} />
+            <Card>
+              <View style={styles.cardH}>
+                <Shield color={colors.gold} size={18} strokeWidth={iconStroke} />
+                <Text style={styles.h}>Datos personales</Text>
+              </View>
+              <Mute>Privado: no se muestra en perfiles ni búsquedas.</Mute>
+              <Row
+                label="Fecha de nacimiento"
+                value={football.fechaNacimiento ?? profile.fecha_nacimiento ?? "Sin cargar"}
+                onPress={onDatosPersonales}
+              />
+              <Row
+                label="DNI"
+                value={profile.tiene_dni ? "Cargado" : "Sin cargar"}
+                onPress={onDatosPersonales}
+              />
             </Card>
 
             <View style={{ height: space[16] }} />

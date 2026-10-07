@@ -26,6 +26,7 @@ export const EQUIPOS_RPC_ERRORS: Record<string, string> = {
   falta_nacimiento: "Falta la fecha de nacimiento en el perfil.",
   falta_dni: "Para desafíos por la cancha necesitás cargar tu DNI.",
   dni_invalido: "Ingresá un DNI válido (7 u 8 números).",
+  dni_no_editable: "Tu DNI ya está cargado. Para cambiarlo escribinos a soporte.",
   fecha_nacimiento_invalida: "La fecha de nacimiento no es válida.",
   menor_13: "Tenés que tener al menos 13 años.",
   menor_18: "Esta acción es solo para mayores de 18.",
