@@ -85,6 +85,16 @@ function num(v: unknown) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function bool(v: unknown) {
+  return v === true || v === "true";
+}
+
+function numOrNull(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function pesosReserva(v: unknown) {
   return formatPremio(num(v));
 }
@@ -127,9 +137,15 @@ export async function listarTurnosDePredio(canchaId: string): Promise<TurnoPubli
       campo_id: str(t.campo_id),
       campo_nombre: str(t.campo_nombre),
       campo_tipo: str(t.campo_tipo),
+      campo_superficie:
+        t.campo_superficie == null || str(t.campo_superficie) === "" ? null : str(t.campo_superficie),
+      campo_techada: bool(t.campo_techada),
       cancha_id: str(t.cancha_id),
       cancha_nombre: str(t.cancha_nombre),
-      barrio: t.barrio == null ? null : str(t.barrio),
+      barrio: t.barrio == null || str(t.barrio) === "" ? null : str(t.barrio),
+      direccion: t.direccion == null || str(t.direccion) === "" ? null : str(t.direccion),
+      lat: numOrNull(t.lat),
+      lng: numOrNull(t.lng),
     }));
 }
 

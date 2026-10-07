@@ -28,9 +28,14 @@ export type TurnoPublico = {
   campo_id: string;
   campo_nombre: string;
   campo_tipo: string;
+  campo_superficie: string | null;
+  campo_techada: boolean;
   cancha_id: string;
   cancha_nombre: string;
   barrio: string | null;
+  direccion: string | null;
+  lat: number | null;
+  lng: number | null;
 };
 
 export type RelojPlc = {
@@ -82,9 +87,14 @@ export async function listarTurnosPublicos(): Promise<{ data: TurnoPublico[]; er
     campo_id: str(t.campo_id),
     campo_nombre: str(t.campo_nombre),
     campo_tipo: str(t.campo_tipo),
+    campo_superficie: t.campo_superficie == null || str(t.campo_superficie) === "" ? null : str(t.campo_superficie),
+    campo_techada: bool(t.campo_techada),
     cancha_id: str(t.cancha_id),
     cancha_nombre: str(t.cancha_nombre),
-    barrio: t.barrio == null ? null : str(t.barrio),
+    barrio: t.barrio == null || str(t.barrio) === "" ? null : str(t.barrio),
+    direccion: t.direccion == null || str(t.direccion) === "" ? null : str(t.direccion),
+    lat: num(t.lat),
+    lng: num(t.lng),
   }));
   return { data, error: null };
 }

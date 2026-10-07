@@ -18,9 +18,12 @@ import {
   esFinde,
   esHoy,
   esManana,
-  etiquetaTipo,
+  etiquetaSuperficie,
+  etiquetaTipoCorta,
+  normalizarTipo,
   type Desafio,
 } from "../../lib/desafios";
+import { formatDistanciaKm, getUserLocation, haversineKm, type LatLng } from "../../lib/geo";
 import { ChevronDown, ChevronRight, MapPin, UsersRound, iconStroke } from "../../lib/icons";
 import { esPartidoProximo, listMisPartidos, type MiPartido } from "../../lib/mis-partidos";
 import { loadFootballProfile } from "../../lib/perfil";
@@ -95,6 +98,7 @@ export function InicioScreen({
   const [proximos, setProximos] = useState<MiPartido[]>([]);
   const [reservas, setReservas] = useState<ReservaMia[]>([]);
   const [turnos, setTurnos] = useState<TurnoPublico[]>([]);
+  const [userLoc, setUserLoc] = useState<LatLng | null>(null);
   const [homeLoading, setHomeLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -122,20 +126,25 @@ export function InicioScreen({
     setTurnos(res.data);
   }, []);
 
+  const loadLocation = useCallback(async () => {
+    const loc = await getUserLocation();
+    setUserLoc(loc);
+  }, []);
+
   useEffect(() => {
     let live = true;
     setHomeLoading(true);
-    Promise.all([loadMine(), loadTurnos()]).finally(() => {
+    Promise.all([loadMine(), loadTurnos(), loadLocation()]).finally(() => {
       if (live) setHomeLoading(false);
     });
     return () => {
       live = false;
     };
-  }, [loadMine, loadTurnos]);
+  }, [loadMine, loadTurnos, loadLocation]);
 
   const pull = async () => {
     setRefreshing(true);
-    await Promise.all([onRefresh(), loadMine(), loadTurnos()]);
+    await Promise.all([onRefresh(), loadMine(), loadTurnos(), loadLocation()]);
     setRefreshing(false);
   };
 
@@ -143,37 +152,94 @@ export function InicioScreen({
     return items.filter((d) => {
       if (d.estado !== "abierto") return false;
       if (!matchWhen(d.fecha, when)) return false;
-      if (tipo !== "todos" && d.tipo !== tipo) return false;
+      if (tipo !== "todos" && normalizarTipo(d.tipo) !== tipo) return false;
       return true;
     });
   }, [items, when, tipo]);
 
   const venues = useMemo(() => {
-    const by: Record<
-      string,
-      { canchaId: string; nombre: string; barrio: string | null; tipos: Set<string>; hours: { id: string; hora: string }[] }
-    > = {};
+    type VenueAgg = {
+      canchaId: string;
+      nombre: string;
+      barrio: string | null;
+      direccion: string | null;
+      lat: number | null;
+      lng: number | null;
+      tipos: Set<string>;
+      superficies: Set<string>;
+      techada: boolean;
+      hours: { id: string; hora: string }[];
+    };
+    const by: Record<string, VenueAgg> = {};
     for (const t of turnos) {
       if (!matchWhen(t.fecha, when)) continue;
-      if (tipo !== "todos" && t.campo_tipo !== tipo) continue;
+      if (tipo !== "todos" && normalizarTipo(t.campo_tipo) !== tipo) continue;
       const cur = by[t.cancha_id] ?? {
         canchaId: t.cancha_id,
         nombre: t.cancha_nombre,
         barrio: t.barrio,
+        direccion: t.direccion,
+        lat: t.lat,
+        lng: t.lng,
         tipos: new Set<string>(),
+        superficies: new Set<string>(),
+        techada: false,
         hours: [],
       };
-      cur.tipos.add(t.campo_tipo);
-              if (cur.hours.length < 5 && !cur.hours.some((h) => h.id === t.id)) {
-                cur.hours.push({ id: t.id, hora: t.hora_inicio });
-              }
+      if (!cur.direccion && t.direccion) cur.direccion = t.direccion;
+      if (!cur.barrio && t.barrio) cur.barrio = t.barrio;
+      if (cur.lat == null && t.lat != null) cur.lat = t.lat;
+      if (cur.lng == null && t.lng != null) cur.lng = t.lng;
+      const nt = normalizarTipo(t.campo_tipo);
+      if (nt) cur.tipos.add(nt);
+      if (t.campo_superficie) cur.superficies.add(t.campo_superficie);
+      if (t.campo_techada) cur.techada = true;
+      if (cur.hours.length < 5 && !cur.hours.some((h) => h.id === t.id)) {
+        cur.hours.push({ id: t.id, hora: t.hora_inicio });
+      }
       by[t.cancha_id] = cur;
     }
-    return Object.values(by)
+
+    const ranked = Object.values(by)
       .filter((v) => v.hours.length > 0)
-      .map((v) => ({ ...v, hours: [...v.hours].sort((a, b) => a.hora.localeCompare(b.hora)) }))
-      .slice(0, 6);
-  }, [turnos, when, tipo]);
+      .map((v) => {
+        const km =
+          userLoc && v.lat != null && v.lng != null
+            ? haversineKm(userLoc, { lat: v.lat, lng: v.lng })
+            : null;
+        const tiposOrden = [...v.tipos].sort();
+        const superf = [...v.superficies]
+          .map(etiquetaSuperficie)
+          .filter((x): x is string => Boolean(x));
+        const detallesParts = [
+          ...tiposOrden.map(etiquetaTipoCorta),
+          ...superf,
+          v.techada ? "Techada" : null,
+        ].filter(Boolean) as string[];
+        const ubicacion =
+          [v.direccion, v.barrio && v.direccion && !v.direccion.toLowerCase().includes(v.barrio.toLowerCase()) ? v.barrio : !v.direccion ? v.barrio : null]
+            .filter(Boolean)
+            .join(" · ") || null;
+        return {
+          canchaId: v.canchaId,
+          nombre: v.nombre,
+          ubicacion,
+          distancia: formatDistanciaKm(km),
+          km,
+          detalles: detallesParts.join(" · "),
+          hours: [...v.hours].sort((a, b) => a.hora.localeCompare(b.hora)),
+        };
+      });
+
+    ranked.sort((a, b) => {
+      if (a.km != null && b.km != null) return a.km - b.km;
+      if (a.km != null) return -1;
+      if (b.km != null) return 1;
+      return a.nombre.localeCompare(b.nombre, "es");
+    });
+
+    return ranked.slice(0, 6);
+  }, [turnos, when, tipo, userLoc]);
 
   const showProximos = !guest && (proximos.length > 0 || reservas.length > 0);
   const formatoLabel = tipo === "todos" ? "Formato" : `Fútbol ${tipo.slice(1)}`;
@@ -290,7 +356,11 @@ export function InicioScreen({
         </View>
 
         <View>
-          <SectionTitle title="Canchas libres hoy" action="Ver todos →" onAction={onReservar} />
+          <SectionTitle
+            title={userLoc ? "Canchas libres cerca" : "Canchas libres hoy"}
+            action="Ver todos →"
+            onAction={onReservar}
+          />
           {homeLoading ? (
             <View style={{ gap: 10 }}>
               <View style={[styles.skel, { height: 118 }]} />
@@ -307,8 +377,9 @@ export function InicioScreen({
                 <InicioVenueCard
                   key={v.canchaId}
                   nombre={v.nombre}
-                  barrio={v.barrio}
-                  tipos={[...v.tipos].map(etiquetaTipo).join(" · ")}
+                  ubicacion={v.ubicacion}
+                  distancia={v.distancia}
+                  detalles={v.detalles}
                   hours={v.hours}
                   onPressHour={(turnoId) => onReservarTurno(v.canchaId, turnoId)}
                 />

@@ -114,8 +114,39 @@ export function etiquetaModalidad(premio: number, modalidad?: string | null): st
   return esSoloCancha(premio) ? "Solo por la cancha" : "Por la cancha";
 }
 
+/** Normalize DB values (`5` / `f5`) to `f5`…`f11`. */
+export function normalizarTipo(tipo: string | null | undefined): string {
+  const raw = (tipo ?? "").trim().toLowerCase();
+  if (!raw) return "";
+  if (/^f(5|7|9|11)$/.test(raw)) return raw;
+  if (/^(5|7|9|11)$/.test(raw)) return `f${raw}`;
+  return raw;
+}
+
 export function etiquetaTipo(tipo: string): string {
+  const n = normalizarTipo(tipo);
+  if (n === "f5") return "Fútbol 5";
+  if (n === "f7") return "Fútbol 7";
+  if (n === "f9") return "Fútbol 9";
+  if (n === "f11") return "Fútbol 11";
+  if (!tipo) return "";
   return tipo.replace(/^f/i, "F").toUpperCase();
+}
+
+export function etiquetaTipoCorta(tipo: string): string {
+  const n = normalizarTipo(tipo);
+  if (n.startsWith("f") && n.length > 1) return `F${n.slice(1).toUpperCase()}`;
+  return etiquetaTipo(tipo);
+}
+
+export function etiquetaSuperficie(valor: string | null | undefined): string | null {
+  if (!valor) return null;
+  if (valor === "cesped_sintetico") return "Sintético";
+  if (valor === "cesped_natural") return "Natural";
+  if (valor === "tierra") return "Tierra";
+  if (valor === "cemento") return "Cemento";
+  if (valor === "salon") return "Salón";
+  return valor.replace(/_/g, " ");
 }
 
 export function etiquetaEstado(estado: string): string {
