@@ -236,11 +236,6 @@ begin
     dni = excluded.dni,
     updated_at = now();
 
-  -- Nivel identidad: datos cargados para desafío (sin exponer DNI).
-  update public.usuarios
-  set verification_level = greatest(coalesce(verification_level, 0), 2)
-  where id = v_user;
-
   return jsonb_build_object('ok', true, 'puede_desafio_cancha', true);
 end;
 $$;
