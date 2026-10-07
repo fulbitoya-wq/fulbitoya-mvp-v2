@@ -45,7 +45,6 @@ export function PredioAltaForm({ cancha }: { cancha?: Cancha | null }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
-
   const [responsableNombre, setResponsableNombre] = useState(cancha?.responsable_nombre ?? "");
   const [responsableEmail, setResponsableEmail] = useState(cancha?.responsable_email ?? "");
   const [responsableTelefono, setResponsableTelefono] = useState(cancha?.responsable_telefono ?? "");
@@ -58,6 +57,12 @@ export function PredioAltaForm({ cancha }: { cancha?: Cancha | null }) {
   const [lat, setLat] = useState<number | null>(cancha?.lat ?? null);
   const [lng, setLng] = useState<number | null>(cancha?.lng ?? null);
   const [placeId, setPlaceId] = useState<string | null>(cancha?.place_id ?? null);
+
+  useEffect(() => {
+    if (cancha?.place_id || placeId) return;
+    const q = new URLSearchParams(window.location.search).get("place_id");
+    if (q) setPlaceId(q);
+  }, [cancha?.place_id, placeId]);
   const [estacionamiento, setEstacionamiento] = useState(Boolean(cancha?.estacionamiento));
   const [buffet, setBuffet] = useState(Boolean(cancha?.buffet));
   const [vestuarios, setVestuarios] = useState(Boolean(cancha?.vestuarios));
@@ -127,14 +132,21 @@ export function PredioAltaForm({ cancha }: { cancha?: Cancha | null }) {
   });
 
   const persistir = async (): Promise<string | null> => {
+    let id: string | null = null;
     if (editando && cancha) {
       const res = await actualizarCanchaDelOwner(cancha.id, payload());
       if (!res.ok) throw new Error(res.error ?? "No se pudo guardar.");
-      return cancha.id;
+      id = cancha.id;
+    } else {
+      const { data, error: err } = await crearCancha(payload());
+      if (err || !data?.id) throw new Error(err ?? "No se pudo crear el predio.");
+      id = data.id;
     }
-    const { data, error: err } = await crearCancha(payload());
-    if (err || !data?.id) throw new Error(err ?? "No se pudo crear el predio.");
-    return data.id;
+    // Si venía de Places (no adherido), unificar historial por place_id.
+    if (id && placeId) {
+      await supabase.rpc("plc_unificar_predio_places", { p_cancha_adherida_id: id });
+    }
+    return id;
   };
 
   const onFile = async (file: File | undefined, kind: "logo" | "fondo" | "foto") => {

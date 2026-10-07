@@ -102,6 +102,20 @@ export const EQUIPOS_RPC_ERRORS: Record<string, string> = {
   enlace_vencido: "Ese enlace ya no vale: el horario ya pasó.",
   cobro_externo_invalido: "Elegí si la seña ya se cobró afuera o si se cobra en el predio.",
   senia_no_configurada: "Falta el monto de la seña.",
+  place_id_requerido: "Elegí un lugar de Google para continuar.",
+  coords_requeridas: "Faltan las coordenadas del lugar.",
+  cancha_no_existe: "No encontramos ese predio.",
+  superficie_invalida: "Elegí una superficie válida.",
+  modalidad_libre_invalida: "En cancha no adherida el partido libre es amistoso o competitivo.",
+  fecha_hora_requerida: "Cargá el día y la hora del partido.",
+  precio_sobre_tope: "El precio de la cancha supera el tope para ese formato.",
+  tarifa_no_aceptada: "Tenés que aceptar que la tarifa no se reembolsa en ningún caso.",
+  no_adheridos_sin_plata: "En canchas no adheridas, por la cancha con depósito está desactivado por ahora.",
+  flag_apagado: "Esa función todavía no está activa.",
+  solo_no_adherido: "Eso solo aplica a canchas no adheridas.",
+  datos_validacion_incompletos: "Completá alias o CBU, teléfono del predio y monto.",
+  telefono_coincide_jugador: "El teléfono del predio no puede ser el de un jugador del desafío.",
+  alias_coincide_jugador: "El alias no puede coincidir con el nombre o DNI de un jugador del desafío.",
 };
 
 export function mensajeErrorEquipo(code: string | null | undefined, extra?: { quienes?: string; minimo?: number }): string {

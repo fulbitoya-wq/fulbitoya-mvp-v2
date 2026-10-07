@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, radius, space } from "@shared/design";
+import { useAuth } from "../../auth/AuthProvider";
 import { formatFechaCorta, formatHora } from "../../lib/desafios";
 import { ChevronLeft, iconStroke } from "../../lib/icons";
 import {
@@ -36,6 +37,7 @@ export function ReservaDetalleScreen({
   onChanged,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { session } = useAuth();
   const [reserva, setReserva] = useState<ReservaMia | null>(initial);
   const [listaCount, setListaCount] = useState(0);
   const [listaOpen, setListaOpen] = useState(false);
@@ -115,7 +117,7 @@ export function ReservaDetalleScreen({
       danger: true,
       onConfirm: () => {
         setBusy(true);
-        void cancelarReservaMia(reserva.id).then((res) => {
+        void cancelarReservaMia(reserva.id, session?.access_token).then((res) => {
           setBusy(false);
           if (!res.ok) {
             showNotice("No se pudo cancelar", res.error);
@@ -124,7 +126,9 @@ export function ReservaDetalleScreen({
           const reemb = res.reembolso ?? 0;
           showNotice(
             "Reserva cancelada",
-            reemb > 0 ? `Reembolso estimado: ${pesosReserva(reemb)}.` : "La reserva quedó cancelada."
+            reemb > 0
+              ? `Reembolso estimado: ${pesosReserva(reemb)}. Si el pago fue por Mercado Pago, ya pedimos la devolución.`
+              : "La reserva quedó cancelada."
           );
           onChanged?.();
           void reload();

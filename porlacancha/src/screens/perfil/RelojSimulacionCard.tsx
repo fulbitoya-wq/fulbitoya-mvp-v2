@@ -7,6 +7,7 @@ import {
   setRelojSimulacion,
   type RelojPlc,
 } from "../../lib/plc";
+import { setCheckoutPrueba } from "../../lib/reserva";
 import { Clock, iconStroke } from "../../lib/icons";
 import { Button, Mute, showNotice } from "../../ui";
 import { typeStyle } from "../../ui/textStyle";
@@ -82,9 +83,44 @@ export function RelojSimulacionCard() {
         <Text style={styles.h}>Reloj de simulación</Text>
       </View>
       <Mute>
-        Adelantá el reloj de la base (Argentina) para probar plazos, seña y cierres. No cobra de
-        verdad: el checkout de prueba confirma el pago en este entorno.
+        Adelantá el reloj de la base (Argentina) para probar plazos, seña y cierres. Con checkout de
+        prueba el pago se confirma acá; con Mercado Pago real usás el token de prueba de Vercel.
       </Mute>
+      <Mute>
+        {reloj.checkout_prueba
+          ? "Checkout de prueba: ON (no abre Mercado Pago)."
+          : "Checkout de prueba: OFF (va a Mercado Pago)."}
+      </Mute>
+      <View style={{ marginTop: space[8] }}>
+        <Button
+          label={
+            busy
+              ? "Guardando..."
+              : reloj.checkout_prueba
+                ? "Usar Mercado Pago real"
+                : "Checkout de prueba (sin MP)"
+          }
+          variant="secondary"
+          onPress={() => {
+            setBusy(true);
+            void setCheckoutPrueba(!reloj.checkout_prueba).then(async (res) => {
+              setBusy(false);
+              if (!res.ok) {
+                showNotice("No se pudo cambiar", res.error);
+                return;
+              }
+              await load();
+              showNotice(
+                "Checkout",
+                res.checkoutPrueba
+                  ? "Quedó en modo prueba (sin Mercado Pago)."
+                  : "Quedó con Mercado Pago real (token de prueba en Vercel)."
+              );
+            });
+          }}
+          loading={busy}
+        />
+      </View>
       <Text style={styles.lab}>Ahora en la app</Text>
       <Text style={styles.val}>{reloj.ahora ?? "—"}</Text>
       <Mute>{reloj.simulando ? "Simulando" : "Hora real"}</Mute>

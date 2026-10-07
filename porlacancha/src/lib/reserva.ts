@@ -4,6 +4,7 @@ import {
   mensajeErrorEquipo,
   rpcAbrirBuscaGente,
   rpcCancelarReservaPlc,
+  rpcSetCheckoutPrueba,
   rpcConfirmarPagoReservaPrueba,
   rpcCotizarEnlacePago,
   rpcCotizarReserva,
@@ -390,10 +391,31 @@ export async function listarMisReservas(): Promise<{ data: ReservaMia[]; error: 
   };
 }
 
-export async function cancelarReservaMia(id: string) {
+export async function cancelarReservaMia(id: string, accessToken?: string | null) {
   const res = await rpcCancelarReservaPlc(supabase, id);
   if (!res.ok) return { ok: false as const, error: err(res.error) };
-  return { ok: true as const, reembolso: res.reembolso ?? 0 };
+  const paymentId = res.mercadopago_payment_id;
+  const reembolso = res.reembolso ?? 0;
+  if (reembolso > 0 && paymentId && accessToken) {
+    const web = webBaseUrl();
+    if (web) {
+      await fetch(`${web}/api/pagos/reservas/reembolsar`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ reservaId: id, paymentId }),
+      }).catch(() => null);
+    }
+  }
+  return { ok: true as const, reembolso };
+}
+
+export async function setCheckoutPrueba(activo: boolean) {
+  const res = await rpcSetCheckoutPrueba(supabase, activo);
+  if (!res.ok) return { ok: false as const, error: err(res.error) };
+  return { ok: true as const, checkoutPrueba: Boolean(res.checkout_prueba) };
 }
 
 function altsFrom(raw: unknown): AlternativaTurno[] {
