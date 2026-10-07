@@ -43,6 +43,7 @@ export {
   rpcIniciarCheckoutReserva,
   rpcConfirmarPagoReservaPrueba,
   rpcCancelarReservaPlc,
+  rpcSetCheckoutPrueba,
   rpcListarMisReservasPlc,
   rpcCargarReservaWhatsapp,
   rpcAgendaReservasDia,

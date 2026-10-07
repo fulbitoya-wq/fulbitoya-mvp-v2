@@ -447,10 +447,29 @@ export async function rpcConfirmarPagoReservaPrueba(
 export async function rpcCancelarReservaPlc(
   client: EquiposRpcClient,
   reservaId: string
-): Promise<RpcResult<{ reembolso?: number }>> {
+): Promise<RpcResult<{ reembolso?: number; mercadopago_payment_id?: string }>> {
   const res = await call(client, "plc_cancelar_reserva", { p_reserva_id: reservaId });
   if (!res.ok) return res;
-  return { ok: true, reembolso: Number(res.reembolso ?? 0) };
+  return {
+    ok: true,
+    reembolso: Number(res.reembolso ?? 0),
+    mercadopago_payment_id:
+      res.mercadopago_payment_id == null || res.mercadopago_payment_id === ""
+        ? undefined
+        : String(res.mercadopago_payment_id),
+  };
+}
+
+export async function rpcSetCheckoutPrueba(
+  client: EquiposRpcClient,
+  activo: boolean
+): Promise<RpcResult<{ checkout_prueba?: boolean }>> {
+  const res = await call(client, "plc_set_checkout_prueba", { p_activo: activo });
+  if (!res.ok) return res;
+  return {
+    ok: true,
+    checkout_prueba: res.checkout_prueba === true || res.checkout_prueba === "true",
+  };
 }
 
 export async function rpcListarMisReservasPlc(
