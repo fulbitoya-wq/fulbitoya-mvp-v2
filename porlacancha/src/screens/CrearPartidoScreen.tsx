@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { esErrorIdentidadDesafio } from "@shared/equipos";
 import { colors, radius, space } from "@shared/design";
@@ -8,16 +8,21 @@ import { getEquipoDetalle } from "../lib/equipos";
 import { etiquetaTipo, formatFechaCorta, formatHora, minimoConvocados } from "../lib/desafios";
 import {
   calcularCondiciones,
+  cotizarDepositoPlc,
+  crearEquipoRapidoPlc,
+  crearPartidoDepositoPlc,
+  crearPartidoLibrePlc,
   crearPartidoPlc,
   etiquetaModalidadPlc,
   listarTurnosPublicos,
   pesos,
+  upsertPredioPlaces,
   type PlcModalidad,
   type PlcReglaEmpate,
   type TurnoPublico,
 } from "../lib/plc";
 import { ChevronLeft, iconStroke } from "../lib/icons";
-import { Button, EmptyState, IconBtn, Mute, showNotice } from "../ui";
+import { Button, EmptyState, IconBtn, Mute, PlacesSearch, showNotice, type PlacePick } from "../ui";
 import { typeStyle } from "../ui/textStyle";
 import { CompleteIdentidadDesafioScreen } from "./auth/CompleteIdentidadDesafioScreen";
 
@@ -26,17 +31,43 @@ type Props = {
   onBack: () => void;
   onCreateTeam: () => void;
   onCreated: (desafioId: string, inscripcionId: string) => void;
+  onTeamsChanged?: () => void;
 };
 
-export function CrearPartidoScreen({ captainTeams, onBack, onCreateTeam, onCreated }: Props) {
+type OrigenCancha = "fulbitoya" | "places";
+type EquipoModo = "equipo" | "nuevo" | "sin_equipo";
+type Superficie = "cesped_natural" | "cesped_sintetico" | "tierra" | "cemento";
+
+export function CrearPartidoScreen({
+  captainTeams,
+  onBack,
+  onCreateTeam,
+  onCreated,
+  onTeamsChanged,
+}: Props) {
   const insets = useSafeAreaInsets();
+  const [equipoModo, setEquipoModo] = useState<EquipoModo>(captainTeams.length ? "equipo" : "nuevo");
   const [equipoId, setEquipoId] = useState(captainTeams[0]?.id ?? "");
+  const [nuevoNombre, setNuevoNombre] = useState("");
   const [miembros, setMiembros] = useState<MiembroPlantel[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [modalidad, setModalidad] = useState<PlcModalidad>("por_la_cancha");
+  const [modalidad, setModalidad] = useState<PlcModalidad>("amistoso");
   const [regla, setRegla] = useState<PlcReglaEmpate>("penales");
+  const [origen, setOrigen] = useState<OrigenCancha>("fulbitoya");
   const [turnos, setTurnos] = useState<TurnoPublico[]>([]);
   const [turnoId, setTurnoId] = useState<string | null>(null);
+  const [placeCanchaId, setPlaceCanchaId] = useState<string | null>(null);
+  const [placeLabel, setPlaceLabel] = useState<string | null>(null);
+  const [placeAdherido, setPlaceAdherido] = useState(false);
+  const [fecha, setFecha] = useState("");
+  const [hora, setHora] = useState("");
+  const [formatoLibre, setFormatoLibre] = useState<"f5" | "f7" | "f9" | "f11">("f5");
+  const [precioCancha, setPrecioCancha] = useState("");
+  const [superficie, setSuperficie] = useState<Superficie | null>(null);
+  const [techada, setTechada] = useState<boolean | null>(null);
+  const [iluminacion, setIluminacion] = useState<boolean | null>(null);
+  const [aceptaTarifa, setAceptaTarifa] = useState(false);
+  const [cotDep, setCotDep] = useState<Record<string, unknown> | null>(null);
   const [cond, setCond] = useState<Record<string, unknown> | null>(null);
   const [condErr, setCondErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -44,8 +75,16 @@ export function CrearPartidoScreen({ captainTeams, onBack, onCreateTeam, onCreat
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const equipo = captainTeams.find((t) => t.id === equipoId);
-  const formato = (equipo?.formato_habitual ?? "f5").toLowerCase();
+  const formato =
+    origen === "places"
+      ? formatoLibre
+      : ((equipo?.formato_habitual ?? formatoLibre).toLowerCase() as "f5" | "f7" | "f9" | "f11");
   const min = minimoConvocados(formato);
+  const esLibrePlaces =
+    origen === "places" && !placeAdherido && (modalidad === "amistoso" || modalidad === "competitivo");
+  const esDeposito =
+    modalidad === "por_la_cancha" &&
+    ((origen === "fulbitoya" && !!turnoId) || (origen === "places" && !!placeCanchaId));
 
   useEffect(() => {
     void listarTurnosPublicos().then(({ data, error }) => {
@@ -55,13 +94,17 @@ export function CrearPartidoScreen({ captainTeams, onBack, onCreateTeam, onCreat
   }, []);
 
   useEffect(() => {
-    if (!equipoId) return;
+    if (equipoModo !== "equipo" || !equipoId) {
+      setMiembros([]);
+      setPicked(new Set());
+      return;
+    }
     void getEquipoDetalle(equipoId).then((d) => {
       setMiembros(d.miembros);
       const cap = d.miembros.find((m) => m.rol === "capitan");
       setPicked(new Set(cap ? [cap.usuario_id] : []));
     });
-  }, [equipoId]);
+  }, [equipoId, equipoModo]);
 
   const turnosFmt = useMemo(
     () => turnos.filter((t) => String(t.campo_tipo).toLowerCase() === formato),
@@ -69,7 +112,7 @@ export function CrearPartidoScreen({ captainTeams, onBack, onCreateTeam, onCreat
   );
 
   useEffect(() => {
-    if (!turnoId) {
+    if (!turnoId || origen !== "fulbitoya" || modalidad === "por_la_cancha") {
       setCond(null);
       setCondErr(null);
       return;
@@ -88,7 +131,36 @@ export function CrearPartidoScreen({ captainTeams, onBack, onCreateTeam, onCreat
     return () => {
       cancelled = true;
     };
-  }, [turnoId, modalidad]);
+  }, [turnoId, modalidad, origen]);
+
+  useEffect(() => {
+    if (!esDeposito) {
+      setCotDep(null);
+      return;
+    }
+    const precio =
+      origen === "fulbitoya"
+        ? (turnosFmt.find((t) => t.id === turnoId)?.precio ?? Number(precioCancha))
+        : Number(precioCancha);
+    if (!precio || !Number.isFinite(precio) || precio <= 0) {
+      setCotDep(null);
+      return;
+    }
+    let cancelled = false;
+    void cotizarDepositoPlc(precio, formato).then((res) => {
+      if (cancelled) return;
+      if (!res.ok) {
+        setCotDep(null);
+        setCondErr(res.error);
+        return;
+      }
+      setCotDep(res.cot);
+      setCondErr(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [esDeposito, origen, turnoId, precioCancha, formato, turnosFmt]);
 
   const selected = useMemo(() => [...picked], [picked]);
   const turno = turnosFmt.find((t) => t.id === turnoId) ?? null;
@@ -102,26 +174,140 @@ export function CrearPartidoScreen({ captainTeams, onBack, onCreateTeam, onCreat
     });
   };
 
-  const publicar = async () => {
-    if (!turnoId) return;
+  const onPlaceConfirmed = async (place: PlacePick) => {
     setBusy(true);
-    const res = await crearPartidoPlc({
-      disponibilidadId: turnoId,
-      equipoId,
-      convocados: selected,
-      reglaEmpate: regla,
-      modalidad,
+    const res = await upsertPredioPlaces({
+      placeId: place.placeId,
+      nombre: place.nombre,
+      direccion: place.direccion,
+      lat: place.lat,
+      lng: place.lng,
+      barrio: place.barrio,
+      telefono: place.telefono,
     });
     setBusy(false);
     if (!res.ok) {
-      if (modalidad === "por_la_cancha" && esErrorIdentidadDesafio(res.code)) {
-        setNeedIdentidad(true);
-        return;
-      }
-      showNotice("No se pudo publicar", res.error);
+      showNotice("No se pudo guardar el lugar", res.error);
       return;
     }
-    onCreated(res.desafioId, res.inscripcionId);
+    setPlaceCanchaId(res.canchaId);
+    setPlaceLabel(res.nombre);
+    setPlaceAdherido(res.adherido);
+    if (res.aporte_superficie) setSuperficie(res.aporte_superficie as Superficie);
+    if (res.aporte_techada != null) setTechada(res.aporte_techada);
+    if (res.aporte_iluminacion != null) setIluminacion(res.aporte_iluminacion);
+  };
+
+  const asegurarEquipo = async (): Promise<string | null> => {
+    if (equipoModo === "sin_equipo") return null;
+    if (equipoModo === "equipo") return equipoId || null;
+    const nombre = nuevoNombre.trim();
+    if (!nombre) {
+      showNotice("Nombre del equipo", "Poné un nombre para crear el equipo.");
+      return null;
+    }
+    const res = await crearEquipoRapidoPlc(nombre, formato);
+    if (!res.ok) {
+      showNotice("No se pudo crear el equipo", res.error);
+      return null;
+    }
+    onTeamsChanged?.();
+    setEquipoId(res.equipoId);
+    setEquipoModo("equipo");
+    return res.equipoId;
+  };
+
+  const publicar = async () => {
+    setBusy(true);
+    try {
+      if (esLibrePlaces) {
+        if (!placeCanchaId || !fecha || !hora) {
+          showNotice("Faltan datos", "Confirmá el lugar, el día y la hora.");
+          return;
+        }
+        const eq = await asegurarEquipo();
+        if (equipoModo !== "sin_equipo" && !eq) return;
+        const res = await crearPartidoLibrePlc({
+          canchaId: placeCanchaId,
+          fecha,
+          horaInicio: hora.length === 5 ? `${hora}:00` : hora,
+          formato,
+          precioCancha: Number(precioCancha) || 0,
+          modalidad: modalidad === "competitivo" ? "competitivo" : "amistoso",
+          equipoId: eq,
+          convocados: eq ? selected : undefined,
+          reglaEmpate: regla,
+          superficie,
+          techada,
+          iluminacion,
+        });
+        if (!res.ok) {
+          showNotice("No se pudo publicar", res.error);
+          return;
+        }
+        onCreated(res.desafioId, res.inscripcionId);
+        return;
+      }
+
+      if (esDeposito) {
+        const eq = await asegurarEquipo();
+        if (!eq) {
+          showNotice("Equipo", "Para por la cancha con depósito necesitás un equipo.");
+          return;
+        }
+        if (!aceptaTarifa) {
+          showNotice("Tarifa", "Tenés que aceptar que la tarifa no se reembolsa.");
+          return;
+        }
+        const precio =
+          origen === "fulbitoya"
+            ? Number(precioCancha) || turno?.precio || 0
+            : Number(precioCancha) || 0;
+        const res = await crearPartidoDepositoPlc({
+          precioCancha: precio,
+          formato,
+          equipoId: eq,
+          convocados: selected,
+          reglaEmpate: regla,
+          aceptaTarifaNoReembolsable: aceptaTarifa,
+          disponibilidadId: origen === "fulbitoya" ? turnoId : null,
+          canchaId: origen === "places" ? placeCanchaId : null,
+          fecha: origen === "places" ? fecha : null,
+          horaInicio: origen === "places" ? (hora.length === 5 ? `${hora}:00` : hora) : null,
+        });
+        if (!res.ok) {
+          if (esErrorIdentidadDesafio(res.code)) {
+            setNeedIdentidad(true);
+            return;
+          }
+          showNotice("No se pudo publicar", res.error);
+          return;
+        }
+        onCreated(res.desafioId, res.inscripcionId);
+        return;
+      }
+
+      // Fallback: flujo Plus adherido (amistoso con turno)
+      if (!turnoId || !equipoId) return;
+      const res = await crearPartidoPlc({
+        disponibilidadId: turnoId,
+        equipoId,
+        convocados: selected,
+        reglaEmpate: regla,
+        modalidad,
+      });
+      if (!res.ok) {
+        if (modalidad === "por_la_cancha" && esErrorIdentidadDesafio(res.code)) {
+          setNeedIdentidad(true);
+          return;
+        }
+        showNotice("No se pudo publicar", res.error);
+        return;
+      }
+      onCreated(res.desafioId, res.inscripcionId);
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (needIdentidad) {
@@ -136,26 +322,21 @@ export function CrearPartidoScreen({ captainTeams, onBack, onCreateTeam, onCreat
     );
   }
 
-  if (captainTeams.length === 0) {
-    return (
-      <View style={styles.fill}>
-        <View style={[styles.bar, { paddingTop: Math.max(insets.top, space[8]) }]}>
-          <IconBtn onPress={onBack} label="Volver">
-            <ChevronLeft color={colors.gold} size={22} strokeWidth={iconStroke} />
-          </IconBtn>
-          <Text style={styles.title}>Publicar partido</Text>
-          <View style={{ width: 48 }} />
-        </View>
-        <View style={{ padding: space[16] }}>
-          <EmptyState
-            title="Necesitás ser capitán"
-            body="Solo el capitán publica el partido. Creá un equipo o pedí la capitanía."
-            action={<Button label="Crear equipo" onPress={onCreateTeam} />}
-          />
-        </View>
-      </View>
-    );
-  }
+  const canPublishLibre =
+    esLibrePlaces &&
+    !!placeCanchaId &&
+    !!fecha &&
+    !!hora &&
+    (equipoModo === "sin_equipo" ||
+      (equipoModo === "nuevo" && nuevoNombre.trim().length > 0) ||
+      (equipoModo === "equipo" && (!!equipoId && (selected.length >= 1 || miembros.length === 0))));
+
+  const canPublishDeposito =
+    esDeposito &&
+    aceptaTarifa &&
+    equipoModo !== "sin_equipo" &&
+    (origen === "fulbitoya" ? !!turnoId : !!placeCanchaId && !!fecha && !!hora) &&
+    selected.length >= min;
 
   return (
     <View style={styles.fill}>
@@ -163,71 +344,258 @@ export function CrearPartidoScreen({ captainTeams, onBack, onCreateTeam, onCreat
         <IconBtn onPress={onBack} label="Volver">
           <ChevronLeft color={colors.gold} size={22} strokeWidth={iconStroke} />
         </IconBtn>
-        <Text style={styles.title}>Publicar partido</Text>
+        <Text style={styles.title}>Armar partido</Text>
         <View style={{ width: 48 }} />
       </View>
       <ScrollView contentContainerStyle={{ padding: space[16], paddingBottom: insets.bottom + space[40] }}>
-        <Text style={styles.h}>Modalidad</Text>
+        <Text style={styles.h}>Tu equipo</Text>
         <View style={styles.rowWrap}>
-          {(["por_la_cancha", "amistoso"] as const).map((m) => (
+          {(
+            [
+              ["equipo", "Elegir equipo"],
+              ["nuevo", "Crear equipo"],
+              ["sin_equipo", "Sin equipo"],
+            ] as const
+          ).map(([k, label]) => (
+            <Pressable
+              key={k}
+              onPress={() => setEquipoModo(k)}
+              style={[styles.chip, equipoModo === k && styles.chipOn]}
+            >
+              <Text style={styles.chipT}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {equipoModo === "equipo" ? (
+          captainTeams.length === 0 ? (
+            <EmptyState
+              title="Todavía no sos capitán"
+              body="Creá un equipo con un nombre o jugá sin equipo."
+              action={<Button label="Crear equipo" onPress={() => setEquipoModo("nuevo")} />}
+            />
+          ) : (
+            captainTeams.map((t) => (
+              <Pressable
+                key={t.id}
+                onPress={() => setEquipoId(t.id)}
+                style={[styles.card, equipoId === t.id && styles.cardOn]}
+              >
+                <Text style={styles.body}>{t.nombre}</Text>
+                <Mute>{etiquetaTipo(t.formato_habitual ?? "f5")}</Mute>
+              </Pressable>
+            ))
+          )
+        ) : null}
+        {equipoModo === "nuevo" ? (
+          <TextInput
+            value={nuevoNombre}
+            onChangeText={setNuevoNombre}
+            placeholder="Nombre del equipo"
+            placeholderTextColor={colors.textSecondary}
+            style={styles.input}
+          />
+        ) : null}
+        {equipoModo === "sin_equipo" ? (
+          <Mute>Jugás sin equipo. Podés sumar gente después; en cancha no adherida el partido es gratis.</Mute>
+        ) : null}
+
+        <Text style={[styles.h, { marginTop: space[16] }]}>Modalidad</Text>
+        <View style={styles.rowWrap}>
+          {(["amistoso", "competitivo", "por_la_cancha"] as const).map((m) => (
             <Pressable key={m} onPress={() => setModalidad(m)} style={[styles.chip, modalidad === m && styles.chipOn]}>
               <Text style={styles.chipT}>{etiquetaModalidadPlc(m)}</Text>
             </Pressable>
           ))}
         </View>
         <Mute>
-          {modalidad === "amistoso"
-            ? "El rival puede ser un equipo o jugadores sueltos. Si se completa, te devolvemos la mitad de la cancha."
-            : "Dos equipos. El monto lo calcula el predio: no lo edités vos."}
+          {modalidad === "por_la_cancha"
+            ? "Cada lado deposita el valor de la cancha más la tarifa. Al ganador se le devuelve el depósito."
+            : origen === "places" && !placeAdherido
+              ? "Gratis en la app. Los que se suman pagan en el lugar. Etiqueta: Cancha no adherida."
+              : "Partido abierto. En predio adherido puede haber tarifa Plus según el turno."}
         </Mute>
 
-        {captainTeams.length > 1 ? (
-          <View style={{ marginTop: space[16], gap: space[8] }}>
-            <Text style={styles.h}>Equipo</Text>
-            {captainTeams.map((t) => (
-              <Pressable key={t.id} onPress={() => setEquipoId(t.id)} style={[styles.card, equipoId === t.id && styles.cardOn]}>
-                <Text style={styles.body}>{t.nombre}</Text>
-                <Mute>{etiquetaTipo(t.formato_habitual ?? "f5")}</Mute>
-              </Pressable>
-            ))}
-          </View>
+        <Text style={[styles.h, { marginTop: space[16] }]}>¿Dónde juegan?</Text>
+        <View style={styles.rowWrap}>
+          <Pressable
+            onPress={() => setOrigen("fulbitoya")}
+            style={[styles.chip, origen === "fulbitoya" && styles.chipOn]}
+          >
+            <Text style={styles.chipT}>Predios FulbitoYa</Text>
+          </Pressable>
+          <Pressable onPress={() => setOrigen("places")} style={[styles.chip, origen === "places" && styles.chipOn]}>
+            <Text style={styles.chipT}>Buscar en Google</Text>
+          </Pressable>
+        </View>
+
+        {origen === "fulbitoya" ? (
+          <>
+            {loadErr ? <Mute>{loadErr}</Mute> : null}
+            {turnosFmt.length === 0 ? (
+              <Mute>No hay turnos libres para {etiquetaTipo(formato)}. Probá buscar en Google.</Mute>
+            ) : (
+              turnosFmt.slice(0, 40).map((t) => (
+                <Pressable
+                  key={t.id}
+                  onPress={() => {
+                    setTurnoId(t.id);
+                    if (t.precio != null) setPrecioCancha(String(Math.round(t.precio)));
+                  }}
+                  style={[styles.card, turnoId === t.id && styles.cardOn]}
+                >
+                  <Text style={styles.body}>
+                    {t.cancha_nombre}
+                    {t.barrio ? ` · ${t.barrio}` : ""}
+                  </Text>
+                  <Mute>
+                    {t.campo_nombre} · {formatFechaCorta(t.fecha)} · {formatHora(t.hora_inicio)}
+                    {t.precio != null ? ` · ${pesos(t.precio)}` : ""}
+                  </Mute>
+                </Pressable>
+              ))
+            )}
+          </>
         ) : (
-          <Text style={[styles.h, { marginTop: space[16] }]}>{equipo?.nombre}</Text>
+          <>
+            {placeCanchaId ? (
+              <View style={styles.cardOn}>
+                <Text style={styles.body}>{placeLabel}</Text>
+                <Mute>{placeAdherido ? "Predio adherido" : "Cancha no adherida"}</Mute>
+                <Pressable
+                  onPress={() => {
+                    setPlaceCanchaId(null);
+                    setPlaceLabel(null);
+                  }}
+                >
+                  <Mute>Cambiar lugar</Mute>
+                </Pressable>
+              </View>
+            ) : (
+              <PlacesSearch onConfirmed={(p) => void onPlaceConfirmed(p)} />
+            )}
+            {placeCanchaId ? (
+              <>
+                <Text style={[styles.h, { marginTop: space[16] }]}>Día y hora</Text>
+                <TextInput
+                  value={fecha}
+                  onChangeText={setFecha}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.input}
+                />
+                <TextInput
+                  value={hora}
+                  onChangeText={setHora}
+                  placeholder="HH:MM"
+                  placeholderTextColor={colors.textSecondary}
+                  style={[styles.input, { marginTop: space[8] }]}
+                />
+                <Text style={[styles.h, { marginTop: space[16] }]}>Formato</Text>
+                <View style={styles.rowWrap}>
+                  {(["f5", "f7", "f9", "f11"] as const).map((f) => (
+                    <Pressable
+                      key={f}
+                      onPress={() => setFormatoLibre(f)}
+                      style={[styles.chip, formatoLibre === f && styles.chipOn]}
+                    >
+                      <Text style={styles.chipT}>{etiquetaTipo(f)}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={[styles.h, { marginTop: space[16] }]}>Precio de la cancha (en el lugar)</Text>
+                <TextInput
+                  value={precioCancha}
+                  onChangeText={setPrecioCancha}
+                  keyboardType="numeric"
+                  placeholder="Ej: 40000"
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.input}
+                />
+                <Text style={[styles.h, { marginTop: space[16] }]}>Superficie</Text>
+                <View style={styles.rowWrap}>
+                  {(
+                    [
+                      ["cesped_sintetico", "Sintético"],
+                      ["cesped_natural", "Natural"],
+                      ["tierra", "Tierra"],
+                      ["cemento", "Cemento"],
+                    ] as const
+                  ).map(([k, label]) => (
+                    <Pressable
+                      key={k}
+                      onPress={() => setSuperficie(k)}
+                      style={[styles.chip, superficie === k && styles.chipOn]}
+                    >
+                      <Text style={styles.chipT}>{label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={[styles.h, { marginTop: space[12] }]}>Techada</Text>
+                <View style={styles.rowWrap}>
+                  <Pressable onPress={() => setTechada(true)} style={[styles.chip, techada === true && styles.chipOn]}>
+                    <Text style={styles.chipT}>Sí</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setTechada(false)} style={[styles.chip, techada === false && styles.chipOn]}>
+                    <Text style={styles.chipT}>No</Text>
+                  </Pressable>
+                </View>
+                <Text style={[styles.h, { marginTop: space[12] }]}>Iluminación</Text>
+                <View style={styles.rowWrap}>
+                  <Pressable
+                    onPress={() => setIluminacion(true)}
+                    style={[styles.chip, iluminacion === true && styles.chipOn]}
+                  >
+                    <Text style={styles.chipT}>Sí</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setIluminacion(false)}
+                    style={[styles.chip, iluminacion === false && styles.chipOn]}
+                  >
+                    <Text style={styles.chipT}>No</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+          </>
         )}
 
-        <Text style={[styles.h, { marginTop: space[16] }]}>Turno</Text>
-        {loadErr ? <Mute>{loadErr}</Mute> : null}
-        {turnosFmt.length === 0 ? (
-          <Mute>No hay turnos libres para {etiquetaTipo(formato)}.</Mute>
-        ) : (
-          turnosFmt.slice(0, 40).map((t) => (
-            <Pressable key={t.id} onPress={() => setTurnoId(t.id)} style={[styles.card, turnoId === t.id && styles.cardOn]}>
-              <Text style={styles.body}>
-                {t.cancha_nombre}
-                {t.barrio ? ` · ${t.barrio}` : ""}
-              </Text>
-              <Mute>
-                {t.campo_nombre} · {formatFechaCorta(t.fecha)} · {formatHora(t.hora_inicio)}
-                {t.precio != null ? ` · ${pesos(t.precio)}` : ""}
-              </Mute>
-            </Pressable>
-          ))
-        )}
+        {modalidad === "por_la_cancha" && origen === "fulbitoya" && turno ? (
+          <>
+            <Text style={[styles.h, { marginTop: space[16] }]}>Valor de la cancha</Text>
+            <TextInput
+              value={precioCancha}
+              onChangeText={setPrecioCancha}
+              keyboardType="numeric"
+              placeholder={turno.precio != null ? String(Math.round(turno.precio)) : "Monto"}
+              placeholderTextColor={colors.textSecondary}
+              style={styles.input}
+            />
+          </>
+        ) : null}
 
         {condErr ? <Text style={styles.err}>{condErr}</Text> : null}
-        {cond && cond.ok !== false ? (
+        {cotDep && cotDep.ok !== false ? (
+          <View style={{ marginTop: space[12], gap: space[4] }}>
+            <Text style={styles.h}>Desglose</Text>
+            <Mute>
+              Cancha {pesos(cotDep.precio_cancha)} · Tarifa {pesos(cotDep.tarifa)} · Total por equipo{" "}
+              {pesos(cotDep.total_equipo)}
+            </Mute>
+            <Pressable onPress={() => setAceptaTarifa((v) => !v)} style={styles.row}>
+              <View style={[styles.box, aceptaTarifa && styles.boxOn]} />
+              <Text style={styles.body}>
+                {typeof cotDep.texto_tarifa === "string"
+                  ? cotDep.texto_tarifa
+                  : "La tarifa cubre el procesamiento del pago y no se reembolsa en ningún caso."}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {cond && cond.ok !== false && !esDeposito ? (
           <View style={{ marginTop: space[12], gap: space[4] }}>
             <Text style={styles.h}>Condiciones</Text>
             <Mute>{typeof cond.mensaje_tramo === "string" ? cond.mensaje_tramo : ""}</Mute>
             <Mute>Cancha {pesos(cond.precio_cancha)} · tu equipo {pesos(cond.monto_equipo_a)}</Mute>
-            {modalidad === "amistoso" ? (
-              <Mute>
-                Rival equipo {pesos(cond.monto_rival_equipo)} · suelto {pesos(cond.monto_rival_jugador)}
-              </Mute>
-            ) : (
-              <Mute>Rival {pesos(cond.monto_rival_equipo)}</Mute>
-            )}
-            <Mute>Si no hay rival, se retiene {pesos(cond.sena_sin_rival)}.</Mute>
           </View>
         ) : null}
 
@@ -244,27 +612,52 @@ export function CrearPartidoScreen({ captainTeams, onBack, onCreateTeam, onCreat
           </Pressable>
         </View>
 
-        <Text style={[styles.h, { marginTop: space[16] }]}>
-          Quiénes juegan ({selected.length}/{min})
-        </Text>
-        {miembros.map((m) => {
-          const on = picked.has(m.usuario_id);
-          return (
-            <Pressable key={m.usuario_id} onPress={() => toggle(m.usuario_id)} style={styles.row}>
-              <View style={[styles.box, on && styles.boxOn]} />
-              <Text style={styles.body}>
-                {m.nombre || (m.username ? `@${m.username}` : "Jugador")}
-                {m.rol === "capitan" ? " · Capitán" : ""}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {equipoModo === "equipo" && miembros.length > 0 ? (
+          <>
+            <Text style={[styles.h, { marginTop: space[16] }]}>
+              Quiénes juegan ({selected.length}/{min})
+            </Text>
+            {miembros.map((m) => {
+              const on = picked.has(m.usuario_id);
+              return (
+                <Pressable key={m.usuario_id} onPress={() => toggle(m.usuario_id)} style={styles.row}>
+                  <View style={[styles.box, on && styles.boxOn]} />
+                  <Text style={styles.body}>
+                    {m.nombre || (m.username ? `@${m.username}` : "Jugador")}
+                    {m.rol === "capitan" ? " · Capitán" : ""}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </>
+        ) : null}
+
+        {equipoModo === "equipo" && equipoId ? (
+          <View style={{ marginTop: space[12] }}>
+            <Button label="Crear equipo (pantalla completa)" onPress={onCreateTeam} variant="ghost" />
+          </View>
+        ) : null}
 
         <View style={{ marginTop: space[24] }}>
           <Button
-            label={busy ? "Publicando..." : "Publicar y continuar al pago"}
+            label={
+              busy
+                ? "Publicando..."
+                : esLibrePlaces
+                  ? "Publicar partido gratis"
+                  : esDeposito
+                    ? "Publicar y continuar al pago"
+                    : "Publicar y continuar al pago"
+            }
             onPress={() => void publicar()}
-            disabled={!turno || selected.length < min || busy || miembros.length < min}
+            disabled={
+              busy ||
+              (esLibrePlaces
+                ? !canPublishLibre
+                : esDeposito
+                  ? !canPublishDeposito
+                  : !turno || selected.length < min || miembros.length < min)
+            }
             loading={busy}
           />
         </View>
@@ -300,8 +693,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     marginTop: space[8],
   },
-  cardOn: { borderColor: colors.gold },
+  cardOn: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: radius.md,
+    padding: space[12],
+    backgroundColor: colors.surface,
+    marginTop: space[8],
+  },
   row: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: space[12], paddingVertical: space[8] },
   box: { width: 22, height: 22, borderRadius: 4, borderWidth: 2, borderColor: colors.gold },
   boxOn: { backgroundColor: colors.gold },
+  input: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: space[12],
+    color: colors.white,
+    backgroundColor: colors.surface,
+    marginTop: space[8],
+    ...typeStyle("body", colors.white),
+  },
 });

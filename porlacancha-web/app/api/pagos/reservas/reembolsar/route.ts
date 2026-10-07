@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       const admin = getSupabaseAdmin();
       await admin
         .from("movimientos")
-        .update({ estado: "completado" })
+        .update({ estado: "procesado", processed_at: new Date().toISOString() })
         .eq("reserva_id", reservaId)
         .eq("tipo", "reembolso_reserva")
         .eq("estado", "pendiente");

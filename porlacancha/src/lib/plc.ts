@@ -4,8 +4,12 @@ import {
   rpcCondicionesDeDesafio,
   rpcConfirmarPagoPrueba,
   rpcCorrerTareaPeriodicaPlc,
+  rpcCotizarDeposito,
   rpcCotizarReservaPlus,
+  rpcCrearEquipoRapido,
   rpcCrearPartido,
+  rpcCrearPartidoDeposito,
+  rpcCrearPartidoLibre,
   rpcDecidirSinRival,
   rpcGetRelojPlc,
   rpcInscribirJugadorAmistoso,
@@ -13,7 +17,9 @@ import {
   rpcMontoAPagarInscripcion,
   rpcOpcionesSinRival,
   rpcPasarAPlus,
+  rpcRegistrarAporteCancha,
   rpcSetRelojSimulacion,
+  rpcUpsertPredioPlaces,
 } from "@shared/equipos";
 import { formatPremio } from "./desafios";
 import type { ReservaBusca } from "./reserva-draft";
@@ -216,6 +222,110 @@ export async function crearPartidoPlc(input: {
     montoTotal: res.monto_total ?? 0,
     tarifaPlus: res.tarifa_plus ?? 0,
   };
+}
+
+export async function upsertPredioPlaces(input: {
+  placeId: string;
+  nombre: string;
+  direccion: string;
+  lat: number;
+  lng: number;
+  barrio?: string | null;
+  telefono?: string | null;
+}) {
+  const res = await rpcUpsertPredioPlaces(supabase, input);
+  if (!res.ok) return { ok: false as const, error: err(res.error) };
+  return {
+    ok: true as const,
+    canchaId: str(res.cancha_id),
+    adherido: bool(res.adherido),
+    nombre: str(res.nombre),
+    aporte_superficie: res.aporte_superficie == null ? null : str(res.aporte_superficie),
+    aporte_techada: res.aporte_techada == null ? null : bool(res.aporte_techada),
+    aporte_iluminacion: res.aporte_iluminacion == null ? null : bool(res.aporte_iluminacion),
+  };
+}
+
+export async function crearPartidoLibrePlc(input: {
+  canchaId: string;
+  fecha: string;
+  horaInicio: string;
+  formato: string;
+  precioCancha: number;
+  modalidad: "amistoso" | "competitivo";
+  equipoId?: string | null;
+  convocados?: string[];
+  reglaEmpate: PlcReglaEmpate;
+  superficie?: string | null;
+  techada?: boolean | null;
+  iluminacion?: boolean | null;
+}) {
+  const res = await rpcCrearPartidoLibre(supabase, input);
+  if (!res.ok) {
+    return {
+      ok: false as const,
+      error: mensajeErrorEquipo(res.error, { minimo: res.minimo, quienes: res.quienes }),
+      code: res.error,
+    };
+  }
+  return {
+    ok: true as const,
+    desafioId: res.desafio_id,
+    inscripcionId: res.inscripcion_id,
+    montoTotal: 0,
+  };
+}
+
+export async function cotizarDepositoPlc(precioCancha: number, formato: string, jugadoresLado?: number) {
+  const res = await rpcCotizarDeposito(supabase, precioCancha, formato, jugadoresLado);
+  if (!res.ok) return { ok: false as const, error: err(res.error), code: res.error };
+  return { ok: true as const, cot: res as Record<string, unknown> };
+}
+
+export async function crearPartidoDepositoPlc(input: {
+  precioCancha: number;
+  formato: string;
+  equipoId: string;
+  convocados: string[];
+  reglaEmpate: PlcReglaEmpate;
+  aceptaTarifaNoReembolsable: boolean;
+  disponibilidadId?: string | null;
+  canchaId?: string | null;
+  fecha?: string | null;
+  horaInicio?: string | null;
+  jugadoresLado?: number | null;
+}) {
+  const res = await rpcCrearPartidoDeposito(supabase, input);
+  if (!res.ok) {
+    return {
+      ok: false as const,
+      error: mensajeErrorEquipo(res.error, { minimo: res.minimo, quienes: res.quienes }),
+      code: res.error,
+    };
+  }
+  return {
+    ok: true as const,
+    desafioId: res.desafio_id,
+    inscripcionId: res.inscripcion_id,
+    montoTotal: res.monto_total ?? 0,
+  };
+}
+
+export async function crearEquipoRapidoPlc(nombre: string, formato: string) {
+  const res = await rpcCrearEquipoRapido(supabase, nombre, formato);
+  if (!res.ok) return { ok: false as const, error: err(res.error) };
+  return { ok: true as const, equipoId: res.equipo_id };
+}
+
+export async function registrarAporteCanchaPlc(input: {
+  canchaId: string;
+  superficie?: string | null;
+  techada?: boolean | null;
+  iluminacion?: boolean | null;
+}) {
+  const res = await rpcRegistrarAporteCancha(supabase, input);
+  if (!res.ok) return { ok: false as const, error: err(res.error) };
+  return { ok: true as const };
 }
 
 export async function pasarAPlusPlc(input: {
