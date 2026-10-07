@@ -111,6 +111,7 @@ export function esSoloCancha(premio: number): boolean {
 
 export function etiquetaModalidad(premio: number, modalidad?: string | null): string {
   if (modalidad === "amistoso") return "Amistoso";
+  if (modalidad === "competitivo") return "Competitivo";
   return esSoloCancha(premio) ? "Solo por la cancha" : "Por la cancha";
 }
 

@@ -103,11 +103,21 @@ export type ReservaMia = {
   tipo_cobro: string | null;
   canal: string | null;
   monto_total: number;
+  monto_sena: number | null;
+  monto_cancha: number | null;
+  resta_en_predio: number;
+  busca_gente: boolean;
+  convertida_a_plus: boolean;
+  disponibilidad_id: string | null;
+  cancha_id: string | null;
+  slug: string | null;
   fecha: string;
   hora_inicio: string;
   cancha_nombre: string;
   campo_nombre: string;
   barrio: string | null;
+  direccion: string | null;
+  texto_cancelacion: string | null;
 };
 
 function err(code: string) {
@@ -137,12 +147,68 @@ export function pesosReserva(v: unknown) {
   return formatPremio(num(v));
 }
 
-export function etiquetaEstadoReserva(estado: string): string {
+export function etiquetaEstadoReserva(estado: string, convertidaAPlus = false): string {
+  if (convertidaAPlus && (estado === "cancelada" || estado === "reservada")) return "Pasó a Plus";
   if (estado === "reservada") return "Reservada";
   if (estado === "jugada") return "Jugada";
   if (estado === "cancelada") return "Cancelada";
   if (estado === "cancelada_predio") return "Cancelada por el predio";
   return estado;
+}
+
+export function esReservaProxima(r: ReservaMia): boolean {
+  if (r.estado !== "reservada") return false;
+  const hoy = new Date();
+  const y = hoy.getFullYear();
+  const m = String(hoy.getMonth() + 1).padStart(2, "0");
+  const d = String(hoy.getDate()).padStart(2, "0");
+  return r.fecha >= `${y}-${m}-${d}`;
+}
+
+function mapReservaMia(r: Record<string, unknown>): ReservaMia {
+  const cond =
+    r.condiciones && typeof r.condiciones === "object" && !Array.isArray(r.condiciones)
+      ? (r.condiciones as Record<string, unknown>)
+      : {};
+  const tipo = r.tipo_cobro == null ? null : str(r.tipo_cobro);
+  const montoTotal = num(r.monto_total);
+  const montoCancha = numOrNull(r.monto_cancha) ?? numOrNull(cond.precio_cancha);
+  const montoSena = numOrNull(r.monto_sena) ?? numOrNull(cond.sena);
+  const resta =
+    tipo === "sena" && montoCancha != null ? Math.max(montoCancha - montoTotal, 0) : 0;
+  const canchaId =
+    r.cancha_id == null || str(r.cancha_id) === ""
+      ? cond.cancha_id == null || str(cond.cancha_id) === ""
+        ? null
+        : str(cond.cancha_id)
+      : str(r.cancha_id);
+  return {
+    id: str(r.id),
+    estado: str(r.estado),
+    tipo_cobro: tipo,
+    canal: r.canal == null ? null : str(r.canal),
+    monto_total: montoTotal,
+    monto_sena: montoSena,
+    monto_cancha: montoCancha,
+    resta_en_predio: resta,
+    busca_gente: bool(r.busca_gente),
+    convertida_a_plus: bool(cond.convertida_a_plus),
+    disponibilidad_id: r.disponibilidad_id == null || str(r.disponibilidad_id) === "" ? null : str(r.disponibilidad_id),
+    cancha_id: canchaId,
+    slug: r.slug == null || str(r.slug) === "" ? (cond.slug == null || str(cond.slug) === "" ? null : str(cond.slug)) : str(r.slug),
+    fecha: str(r.fecha),
+    hora_inicio: str(r.hora_inicio),
+    cancha_nombre: str(r.cancha_nombre),
+    campo_nombre: str(r.campo_nombre),
+    barrio: r.barrio == null || str(r.barrio) === "" ? null : str(r.barrio),
+    direccion: r.direccion == null || str(r.direccion) === "" ? null : str(r.direccion),
+    texto_cancelacion:
+      cond.texto_cancelacion == null || str(cond.texto_cancelacion) === ""
+        ? cond.texto_reglas == null || str(cond.texto_reglas) === ""
+          ? null
+          : str(cond.texto_reglas)
+        : str(cond.texto_cancelacion),
+  };
 }
 
 export async function listarPrediosPublicos(): Promise<{ data: PredioPublico[]; error: string | null }> {
@@ -319,18 +385,7 @@ export async function listarMisReservas(): Promise<{ data: ReservaMia[]; error: 
   const res = await rpcListarMisReservasPlc(supabase);
   if (!res.ok) return { data: [], error: err(res.error) };
   return {
-    data: res.reservas.map((r) => ({
-      id: str(r.id),
-      estado: str(r.estado),
-      tipo_cobro: r.tipo_cobro == null ? null : str(r.tipo_cobro),
-      canal: r.canal == null ? null : str(r.canal),
-      monto_total: num(r.monto_total),
-      fecha: str(r.fecha),
-      hora_inicio: str(r.hora_inicio),
-      cancha_nombre: str(r.cancha_nombre),
-      campo_nombre: str(r.campo_nombre),
-      barrio: r.barrio == null ? null : str(r.barrio),
-    })),
+    data: res.reservas.map((r) => mapReservaMia(r)),
     error: null,
   };
 }

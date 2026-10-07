@@ -84,7 +84,14 @@ export async function loadFootballProfile(userId: string): Promise<FootballProfi
   } catch {
     /* ignore */
   }
-  const { data, error } = await supabase.from("jugador_perfiles").select("*").eq("usuario_id", userId).maybeSingle();
+  // Sin dni: el DNI nunca viaja a perfiles ni búsquedas (tampoco al perfil futbolero de UI).
+  const { data, error } = await supabase
+    .from("jugador_perfiles")
+    .select(
+      "apellido, zona, bio, puesto_principal, puesto_secundario, pierna, formatos, disponibilidad, fecha_nacimiento, busca_equipo, modo_juego, tarifa_partido"
+    )
+    .eq("usuario_id", userId)
+    .maybeSingle();
   if (error || !data) return local;
   return rowToFootball(data as Record<string, unknown>, local);
 }

@@ -215,15 +215,19 @@ export async function rpcCrearPartido(
     equipoId: string;
     convocados: string[];
     reglaEmpate: "penales" | "mitad_cada_uno";
-    modalidad: "por_la_cancha" | "amistoso";
+    modalidad: "por_la_cancha" | "amistoso" | "competitivo";
+    libres?: number;
+    busca?: string;
   }
-): Promise<RpcResult<{ desafio_id: string; inscripcion_id: string; monto_total?: number }>> {
+): Promise<RpcResult<{ desafio_id: string; inscripcion_id: string; monto_total?: number; tarifa_plus?: number }>> {
   const res = await call(client, "crear_partido", {
     p_disponibilidad_id: input.disponibilidadId,
     p_equipo_id: input.equipoId,
     p_convocados: input.convocados,
     p_regla_empate: input.reglaEmpate,
     p_modalidad: input.modalidad,
+    p_libres: input.libres ?? null,
+    p_busca: input.busca ?? null,
   });
   if (!res.ok) return res;
   return {
@@ -231,7 +235,50 @@ export async function rpcCrearPartido(
     desafio_id: String(res.desafio_id ?? ""),
     inscripcion_id: String(res.inscripcion_id ?? ""),
     monto_total: typeof res.monto_total === "number" ? res.monto_total : Number(res.monto_total ?? 0),
+    tarifa_plus: typeof res.tarifa_plus === "number" ? res.tarifa_plus : Number(res.tarifa_plus ?? 0),
   };
+}
+
+export async function rpcCotizarReservaPlus(
+  client: EquiposRpcClient,
+  input: {
+    disponibilidadId: string;
+    modalidad: string;
+    libres: number;
+    busca: string;
+    tipoCobro?: "sena" | "total";
+  }
+): Promise<RpcResult<Record<string, unknown>>> {
+  return call(client, "plc_cotizar_reserva_plus", {
+    p_disponibilidad_id: input.disponibilidadId,
+    p_modalidad: input.modalidad,
+    p_libres: input.libres,
+    p_busca: input.busca,
+    p_tipo_cobro: input.tipoCobro ?? "total",
+  });
+}
+
+export async function rpcPasarAPlus(
+  client: EquiposRpcClient,
+  input: {
+    reservaId: string;
+    equipoId: string;
+    convocados: string[];
+    modalidad: string;
+    reglaEmpate: "penales" | "mitad_cada_uno";
+    libres?: number;
+    busca?: string;
+  }
+): Promise<RpcResult<Record<string, unknown>>> {
+  return call(client, "plc_pasar_a_plus", {
+    p_reserva_id: input.reservaId,
+    p_equipo_id: input.equipoId,
+    p_convocados: input.convocados,
+    p_modalidad: input.modalidad,
+    p_regla_empate: input.reglaEmpate,
+    p_libres: input.libres ?? 0,
+    p_busca: input.busca ?? "ambos",
+  });
 }
 
 export async function rpcInscribirJugadorAmistoso(
@@ -579,4 +626,46 @@ export async function rpcAbrirBuscaGente(
   const res = await call(client, "plc_abrir_busca_gente", { p_reserva_id: reservaId, p_abrir: abrir });
   if (!res.ok) return res;
   return { ok: true, busca_gente: Boolean(res.busca_gente) };
+}
+
+export async function rpcMiEstadoEdad(
+  client: EquiposRpcClient
+): Promise<
+  RpcResult<{
+    fecha_nacimiento?: string | null;
+    tiene_dni?: boolean;
+    mayor_13?: boolean;
+    mayor_18?: boolean;
+    puede_desafio_cancha?: boolean;
+  }>
+> {
+  return call(client, "plc_mi_estado_edad", {});
+}
+
+export async function rpcGuardarFechaNacimiento(
+  client: EquiposRpcClient,
+  fechaNacimiento: string
+): Promise<RpcResult<{ fecha_nacimiento?: string }>> {
+  return call(client, "plc_guardar_fecha_nacimiento", { p_fecha_nacimiento: fechaNacimiento });
+}
+
+export async function rpcGuardarIdentidadDesafio(
+  client: EquiposRpcClient,
+  dni: string,
+  fechaNacimiento: string
+): Promise<RpcResult<{ puede_desafio_cancha?: boolean }>> {
+  return call(client, "plc_guardar_identidad_desafio", {
+    p_dni: dni,
+    p_fecha_nacimiento: fechaNacimiento,
+  });
+}
+
+/** Errores que piden cargar DNI/fecha y reintentar la acción de desafío por la cancha. */
+export function esErrorIdentidadDesafio(code: string | null | undefined): boolean {
+  return code === "falta_dni" || code === "falta_nacimiento" || code === "dni_invalido";
+}
+
+/** Errores que piden solo fecha de nacimiento (reserva / amistoso / registro). */
+export function esErrorFaltaNacimiento(code: string | null | undefined): boolean {
+  return code === "falta_nacimiento";
 }

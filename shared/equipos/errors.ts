@@ -23,8 +23,13 @@ export const EQUIPOS_RPC_ERRORS: Record<string, string> = {
   minimo_convocados: "No llega al mínimo de convocados para ese formato.",
   convocado_no_miembro: "Hay alguien marcado que no está en el plantel.",
   convocado_ocupado: "Alguien de la lista ya está convocado en el otro equipo.",
-  falta_nacimiento: "A alguien de la lista le falta la fecha de nacimiento en el perfil.",
-  menor_18: "Todos los convocados tienen que ser mayores de 18.",
+  falta_nacimiento: "Falta la fecha de nacimiento en el perfil.",
+  falta_dni: "Para desafíos por la cancha necesitás cargar tu DNI.",
+  dni_invalido: "Ingresá un DNI válido (7 u 8 números).",
+  dni_no_editable: "Tu DNI ya está cargado. Para cambiarlo escribinos a soporte.",
+  fecha_nacimiento_invalida: "La fecha de nacimiento no es válida.",
+  menor_13: "Tenés que tener al menos 13 años.",
+  menor_18: "Esta acción es solo para mayores de 18.",
   regla_empate_invalida: "Elegí qué pasa si empatan: penales o mitad de cancha para cada uno.",
   tarifa_no_configurada: "Falta configurar la tarifa de servicio.",
   turno_no_existe: "No encontramos ese turno.",
@@ -54,7 +59,7 @@ export const EQUIPOS_RPC_ERRORS: Record<string, string> = {
   no_auto: "Eso no aplica a tu propia cuenta.",
   cupo_lleno: "Ya no hay lugar en este desafío.",
   no_activa: "Esa inscripción ya no está activa.",
-  fuera_de_plazo: "Ya no se puede cancelar: pasó el plazo.",
+  fuera_de_plazo: "Ya no se puede: pasó el plazo.",
   desafios_no_habilitados: "Este predio no admite desafíos en esa cancha.",
   horario_no_habilitado: "Ese horario no está habilitado para desafíos.",
   anticipacion_insuficiente: "Hay que publicar con más anticipación para ese formato.",
@@ -102,10 +107,13 @@ export const EQUIPOS_RPC_ERRORS: Record<string, string> = {
 export function mensajeErrorEquipo(code: string | null | undefined, extra?: { quienes?: string; minimo?: number }): string {
   if (!code) return "No se pudo completar la acción.";
   if (code === "falta_nacimiento" && extra?.quienes) {
-    return `Les falta la fecha de nacimiento: ${extra.quienes}. Cargala en Editar perfil (mayores de 18 si hay premio).`;
+    return `Les falta la fecha de nacimiento: ${extra.quienes}.`;
   }
   if (code === "menor_18" && extra?.quienes) {
-    return `Menores de 18: ${extra.quienes}. Tienen que ser mayores de 18.`;
+    return `Menores de 18: ${extra.quienes}. Para por la cancha tienen que ser mayores de 18.`;
+  }
+  if (code === "menor_13" && extra?.quienes) {
+    return `Menores de 13: ${extra.quienes}. Tienen que tener al menos 13 años.`;
   }
   if (code === "minimo_convocados" && extra?.minimo) {
     return `Tenés que convocar al menos ${extra.minimo} jugadores para este formato.`;

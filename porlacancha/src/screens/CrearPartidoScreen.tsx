@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { esErrorIdentidadDesafio } from "@shared/equipos";
 import { colors, radius, space } from "@shared/design";
 import type { EquipoListItem, MiembroPlantel } from "../lib/equipos";
 import { getEquipoDetalle } from "../lib/equipos";
@@ -18,6 +19,7 @@ import {
 import { ChevronLeft, iconStroke } from "../lib/icons";
 import { Button, EmptyState, IconBtn, Mute, showNotice } from "../ui";
 import { typeStyle } from "../ui/textStyle";
+import { CompleteIdentidadDesafioScreen } from "./auth/CompleteIdentidadDesafioScreen";
 
 type Props = {
   captainTeams: EquipoListItem[];
@@ -38,6 +40,7 @@ export function CrearPartidoScreen({ captainTeams, onBack, onCreateTeam, onCreat
   const [cond, setCond] = useState<Record<string, unknown> | null>(null);
   const [condErr, setCondErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [needIdentidad, setNeedIdentidad] = useState(false);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const equipo = captainTeams.find((t) => t.id === equipoId);
@@ -111,11 +114,27 @@ export function CrearPartidoScreen({ captainTeams, onBack, onCreateTeam, onCreat
     });
     setBusy(false);
     if (!res.ok) {
+      if (modalidad === "por_la_cancha" && esErrorIdentidadDesafio(res.code)) {
+        setNeedIdentidad(true);
+        return;
+      }
       showNotice("No se pudo publicar", res.error);
       return;
     }
     onCreated(res.desafioId, res.inscripcionId);
   };
+
+  if (needIdentidad) {
+    return (
+      <CompleteIdentidadDesafioScreen
+        onCancel={() => setNeedIdentidad(false)}
+        onDone={() => {
+          setNeedIdentidad(false);
+          void publicar();
+        }}
+      />
+    );
+  }
 
   if (captainTeams.length === 0) {
     return (

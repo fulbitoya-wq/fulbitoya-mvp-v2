@@ -52,6 +52,7 @@ type Props = {
   onReservar: () => void;
   onArmar: () => void;
   onOpenDesafio: (d: Desafio) => void;
+  onOpenReserva?: (reserva: ReservaMia) => void;
   onVerPartidos: () => void;
   onVerProximos: () => void;
   onReservarTurno: (canchaId: string, turnoId: string) => void;
@@ -84,6 +85,7 @@ export function InicioScreen({
   onReservar,
   onArmar,
   onOpenDesafio,
+  onOpenReserva,
   onVerPartidos,
   onVerProximos,
   onReservarTurno,
@@ -316,7 +318,11 @@ export function InicioScreen({
             <SectionTitle title="Tus próximos partidos" action="Ver todos →" onAction={onVerProximos} />
             <View style={{ gap: 10 }}>
               {reservas.slice(0, 2).map((r) => (
-                <InicioUpcomingReservaCard key={r.id} reserva={r} />
+                <InicioUpcomingReservaCard
+                  key={r.id}
+                  reserva={r}
+                  onPress={onOpenReserva ? () => onOpenReserva(r) : undefined}
+                />
               ))}
               {proximos.slice(0, 3).map((p) => (
                 <InicioUpcomingMatchCard key={`${p.id}-${p.inscripcionId ?? ""}`} partido={p} onPress={() => onOpenDesafio(p)} />

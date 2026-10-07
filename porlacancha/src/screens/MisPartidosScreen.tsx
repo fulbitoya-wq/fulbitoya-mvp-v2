@@ -12,7 +12,7 @@ import {
   type MiPartido,
 } from "../lib/mis-partidos";
 import {
-  cancelarReservaMia,
+  esReservaProxima,
   etiquetaEstadoReserva,
   listarMisReservas,
   pesosReserva,
@@ -42,6 +42,7 @@ type Props = {
   onRequestAuth: () => void;
   onOpenDesafio: (d: Desafio) => void;
   onEditarConvocados: (d: Desafio) => void;
+  onOpenReserva?: (reserva: ReservaMia) => void;
 };
 
 function rolLabel(p: MiPartido): string {
@@ -50,7 +51,48 @@ function rolLabel(p: MiPartido): string {
   return "Plantel";
 }
 
-export function MisPartidosScreen({ guest, onRequestAuth, onOpenDesafio, onEditarConvocados }: Props) {
+function ReservaRow({ r, onPress }: { r: ReservaMia; onPress?: () => void }) {
+  const tone = r.convertida_a_plus
+    ? "pending"
+    : r.estado === "reservada"
+      ? "open"
+      : r.estado === "cancelada" || r.estado === "cancelada_predio"
+        ? "cancelled"
+        : "pending";
+  const body = (
+    <View style={styles.block}>
+      <Chip label={etiquetaEstadoReserva(r.estado, r.convertida_a_plus)} tone={tone} />
+      <Text style={styles.resT}>
+        {r.cancha_nombre} · {r.campo_nombre}
+      </Text>
+      <Mute>
+        {`${r.fecha} · ${r.hora_inicio.slice(0, 5)}${
+          r.canal === "whatsapp"
+            ? " · por WhatsApp · se paga en el predio"
+            : ` · ${pesosReserva(r.monto_total)}${r.tipo_cobro === "total" ? " · total" : " · seña"}`
+        }`}
+      </Mute>
+      {r.tipo_cobro === "sena" && r.resta_en_predio > 0 && r.estado === "reservada" ? (
+        <Mute>{`Restan ${pesosReserva(r.resta_en_predio)} en el predio`}</Mute>
+      ) : null}
+      {onPress ? <Text style={styles.link}>Ver detalle →</Text> : null}
+    </View>
+  );
+  if (!onPress) return body;
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button">
+      {body}
+    </Pressable>
+  );
+}
+
+export function MisPartidosScreen({
+  guest,
+  onRequestAuth,
+  onOpenDesafio,
+  onEditarConvocados,
+  onOpenReserva,
+}: Props) {
   const [tab, setTab] = useState<Tab>("proximos");
   const [items, setItems] = useState<MiPartido[]>([]);
   const [reservas, setReservas] = useState<ReservaMia[]>([]);
@@ -92,6 +134,17 @@ export function MisPartidosScreen({ guest, onRequestAuth, onOpenDesafio, onEdita
       .filter((p) => !esPartidoProximo(p))
       .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora_inicio.localeCompare(a.hora_inicio));
   }, [items, tab]);
+
+  const reservasTab = useMemo(() => {
+    if (tab === "proximos") {
+      return reservas
+        .filter(esReservaProxima)
+        .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora_inicio.localeCompare(b.hora_inicio));
+    }
+    return reservas
+      .filter((r) => !esReservaProxima(r))
+      .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora_inicio.localeCompare(a.hora_inicio));
+  }, [reservas, tab]);
 
   const pedirCancelar = (p: MiPartido) => {
     showConfirm({
@@ -141,56 +194,20 @@ export function MisPartidosScreen({ guest, onRequestAuth, onOpenDesafio, onEdita
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.gold} />}
       >
         {error ? <Mute>{error}</Mute> : null}
-        {tab === "proximos" && reservas.filter((r) => r.estado === "reservada").length > 0 ? (
-          <View style={{ gap: space[8] }}>
+        {reservasTab.length > 0 ? (
+          <View style={{ gap: space[8], marginBottom: space[16] }}>
             <Text style={styles.sub}>Reservas</Text>
-            {reservas
-              .filter((r) => r.estado === "reservada")
-              .map((r) => (
-                <View key={r.id} style={styles.block}>
-                  <Chip label={etiquetaEstadoReserva(r.estado)} tone="open" />
-                  <Text style={styles.resT}>
-                    {r.cancha_nombre} · {r.campo_nombre}
-                  </Text>
-                  <Mute>
-                    {r.fecha} · {r.hora_inicio.slice(0, 5)}
-                    {r.canal === "whatsapp"
-                      ? " · por WhatsApp · se paga en el predio"
-                      : ` · ${pesosReserva(r.monto_total)}${r.tipo_cobro === "total" ? " · total" : " · seña"}`}
-                  </Mute>
-                  <Pressable
-                    onPress={() => {
-                      showConfirm({
-                        title: "Cancelar reserva",
-                        body: "Se aplica la regla de cancelación del predio (congelada al pagar).",
-                        cancelLabel: "Volver",
-                        confirmLabel: "Cancelar reserva",
-                        danger: true,
-                        onConfirm: () => {
-                          void cancelarReservaMia(r.id).then((res) => {
-                            if (!res.ok) {
-                              showNotice("No se pudo cancelar", res.error);
-                              return;
-                            }
-                            void load();
-                          });
-                        },
-                      });
-                    }}
-                    style={styles.linkHit}
-                  >
-                    <Text style={styles.danger}>Cancelar reserva</Text>
-                  </Pressable>
-                </View>
-              ))}
+            {reservasTab.map((r) => (
+              <ReservaRow key={r.id} r={r} onPress={onOpenReserva ? () => onOpenReserva(r) : undefined} />
+            ))}
           </View>
         ) : null}
-        {!loading && shown.length === 0 && reservas.filter((r) => r.estado === "reservada").length === 0 ? (
+        {!loading && shown.length === 0 && reservasTab.length === 0 ? (
           <EmptyState
             title={tab === "proximos" ? "No tenés partidos próximos" : "Todavía no hay historial"}
             body={
               tab === "proximos"
-                ? "Cuando alguno de tus equipos se inscriba o te convoquen, el desafío queda acá."
+                ? "Cuando reserves o tu equipo se inscriba, aparece acá."
                 : "Acá van los que ya se jugaron, se cancelaron o ya pasó la hora."
             }
           />
@@ -207,9 +224,9 @@ export function MisPartidosScreen({ guest, onRequestAuth, onOpenDesafio, onEdita
                 </View>
                 <DesafioCard desafio={p} onPress={() => onOpenDesafio(p)} />
                 <Mute>
-                  {rolLabel(p)}
-                  {p.miEquipoNombre ? ` · ${p.miEquipoNombre}` : ""}
-                  {p.rivalNombre ? ` vs ${p.rivalNombre}` : p.inscritos.length < 2 ? " · buscando rival" : ""}
+                  {`${rolLabel(p)}${p.miEquipoNombre ? ` · ${p.miEquipoNombre}` : ""}${
+                    p.rivalNombre ? ` vs ${p.rivalNombre}` : p.inscritos.length < 2 ? " · buscando rival" : ""
+                  }`}
                 </Mute>
                 {editar || cancelar ? (
                   <View style={styles.actions}>
@@ -237,7 +254,7 @@ export function MisPartidosScreen({ guest, onRequestAuth, onOpenDesafio, onEdita
 const styles = StyleSheet.create({
   tabs: { flexDirection: "row", flexWrap: "wrap", gap: space[8], marginTop: space[12], marginBottom: space[8] },
   list: { paddingBottom: space[40], paddingTop: space[8] },
-  block: { marginBottom: space[16] },
+  block: { marginBottom: space[16], gap: 4 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space[8], marginBottom: space[8] },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: space[16], marginTop: space[8] },
   linkHit: { minHeight: 44, justifyContent: "center" },

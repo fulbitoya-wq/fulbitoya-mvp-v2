@@ -10,7 +10,7 @@ FulbitoYa es otro producto (reserva de canchas). Podés usar la misma cuenta, pe
 
 ## Quién puede usarlo
 
-Tenés que ser mayor de 18 años. Si publicás un desafío o inscribís un equipo, declarás que podés comprometerte a las reglas de ese partido (horario, lugar, premio).
+Podés crear una cuenta desde los 13 años. Reservar cancha y jugar amistosos también desde los 13. Los desafíos por la cancha (crear, aceptar o pagar) son solo para mayores de 18 con DNI y fecha de nacimiento cargados. Si publicás o te inscribís, declarás que podés comprometerte a las reglas de ese partido.
 
 ## Cuentas y equipos
 

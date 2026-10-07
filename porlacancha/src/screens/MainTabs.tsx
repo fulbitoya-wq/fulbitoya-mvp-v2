@@ -16,6 +16,7 @@ import {
 import {
   clearPendingAction,
   peekPendingAction,
+  profileNeedsBirthdate,
   profileNeedsPhone,
   profileNeedsUsername,
   profileReadyForActions,
@@ -27,6 +28,7 @@ import { mensajeErrorEquipo, rpcPredioPublico, rpcResponderSolicitud } from "@sh
 import { listarMisReservas } from "../lib/reserva";
 import { IconBtn, showNotice } from "../ui";
 import { PorLaCanchaBottomTabBar } from "../ui/PorLaCanchaBottomTabBar";
+import { CompleteBirthdateScreen } from "./auth/CompleteBirthdateScreen";
 import { CompletePhoneScreen } from "./auth/CompletePhoneScreen";
 import { CompleteUsernameScreen } from "./auth/CompleteUsernameScreen";
 import { ExplorarScreen } from "./ExplorarScreen";
@@ -48,8 +50,12 @@ import { InicioScreen } from "./inicio/InicioScreen";
 import { PredioDetalleScreen } from "./predio/PredioDetalleScreen";
 import { ReservarCanchaScreen } from "./ReservarCanchaScreen";
 import { ReservaListaScreen } from "./ReservaListaScreen";
+import { ReservaDetalleScreen } from "./reserva/ReservaDetalleScreen";
+import { ReservaPlusWizard } from "./reserva/ReservaPlusWizard";
 import { ChevronLeft, iconStroke } from "../lib/icons";
 import type { SearchPlayer } from "../lib/player-search";
+import type { ReservaDraft } from "../lib/reserva-draft";
+import type { ReservaMia } from "../lib/reserva";
 
 type Tab = "explore" | "matches" | "teams" | "profile";
 type ExploreView = "hub" | "partidos" | "reservar" | "predio";
@@ -81,7 +87,7 @@ export function MainTabs({ onRequestAuth }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hideProfileNav, setHideProfileNav] = useState(false);
-  const [profileGate, setProfileGate] = useState<null | "username" | "phone">(null);
+  const [profileGate, setProfileGate] = useState<null | "username" | "phone" | "birthdate">(null);
   const [notifsOpen, setNotifsOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notificacion[]>([]);
   const [notifsLoading, setNotifsLoading] = useState(false);
@@ -91,6 +97,8 @@ export function MainTabs({ onRequestAuth }: Props) {
   const [plusSearch, setPlusSearch] = useState(false);
   const [plusPlayer, setPlusPlayer] = useState<SearchPlayer | null>(null);
   const [crearPartidoOpen, setCrearPartidoOpen] = useState(false);
+  const [reservaPlus, setReservaPlus] = useState<Partial<ReservaDraft> | null>(null);
+  const [reservaDetalle, setReservaDetalle] = useState<ReservaMia | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [listaReservaId, setListaReservaId] = useState<string | null>(null);
   const [completarReservaId, setCompletarReservaId] = useState<string | null>(null);
@@ -263,6 +271,10 @@ export function MainTabs({ onRequestAuth }: Props) {
       setProfileGate("phone");
       return;
     }
+    if (profileNeedsBirthdate(profile)) {
+      setProfileGate("birthdate");
+      return;
+    }
     await clearPendingAction();
     await run();
   };
@@ -275,6 +287,10 @@ export function MainTabs({ onRequestAuth }: Props) {
     }
     if (profileNeedsPhone(profile)) {
       setProfileGate("phone");
+      return;
+    }
+    if (profileNeedsBirthdate(profile)) {
+      setProfileGate("birthdate");
       return;
     }
     setProfileGate(null);
@@ -341,7 +357,16 @@ export function MainTabs({ onRequestAuth }: Props) {
         return;
       }
       if (action.kind === "crear_partido") {
-        setCrearPartidoOpen(true);
+        setReservaPlus({ kind: "plus" });
+        return;
+      }
+      if (action.kind === "reserva_plus") {
+        setReservaPlus({
+          kind: "plus",
+          canchaId: action.canchaId,
+          turnoId: action.turnoId,
+          fromReservaId: action.fromReservaId,
+        });
         return;
       }
       if (action.kind === "lista_reserva") {
@@ -493,6 +518,8 @@ export function MainTabs({ onRequestAuth }: Props) {
           <CompleteUsernameScreen />
         ) : loggedIn && profileGate === "phone" ? (
           <CompletePhoneScreen />
+        ) : loggedIn && profileGate === "birthdate" ? (
+          <CompleteBirthdateScreen />
         ) : inscribir ? (
           <InscribirEquipoScreen
             desafio={inscribir.desafio}
@@ -512,6 +539,33 @@ export function MainTabs({ onRequestAuth }: Props) {
               void refreshNotifs();
               void refreshDesafios().then((list) => {
                 const d = list.find((x) => x.id === id);
+                if (d) {
+                  setDetalle(d);
+                  setSelectedId(d.id);
+                }
+              });
+            }}
+          />
+        ) : reservaPlus ? (
+          <ReservaPlusWizard
+            captainTeams={equiposDondeEsCapitan(equipos)}
+            initial={reservaPlus}
+            loggedIn={loggedIn}
+            onRequestAuth={onRequestAuth}
+            onBack={() => setReservaPlus(null)}
+            onCreateTeam={() => {
+              setReservaPlus(null);
+              void queueOrRun({ kind: "create_team" }, () => {
+                setTeamsView({ name: "create" });
+                setTab("teams");
+              });
+            }}
+            onCreated={(desafioId) => {
+              setReservaPlus(null);
+              setReservePrefill(null);
+              setExploreView("hub");
+              void refreshDesafios().then(async (list) => {
+                const d = list.find((x) => x.id === desafioId) ?? (await getDesafioPorId(desafioId));
                 if (d) {
                   setDetalle(d);
                   setSelectedId(d.id);
@@ -602,6 +656,25 @@ export function MainTabs({ onRequestAuth }: Props) {
               void getInscripcionMia(detalle.id, ids, profile?.id).then(setMia);
             }}
           />
+        ) : reservaDetalle ? (
+          <ReservaDetalleScreen
+            reservaId={reservaDetalle.id}
+            initial={reservaDetalle}
+            onBack={() => setReservaDetalle(null)}
+            onPasarAPlus={(reservaId) => {
+              setReservaDetalle(null);
+              void queueOrRun({ kind: "reserva_plus", fromReservaId: reservaId }, () =>
+                setReservaPlus({ kind: "plus", fromReservaId: reservaId })
+              );
+            }}
+            onOpenPredio={(canchaId) => {
+              setReservaDetalle(null);
+              setCalendarOpen(false);
+              setReservePrefill({ canchaId });
+              setExploreView("predio");
+              setTab("explore");
+            }}
+          />
         ) : listaReservaId ? (
           <ReservaListaScreen reservaId={listaReservaId} onBack={() => setListaReservaId(null)} />
         ) : calendarOpen ? (
@@ -621,6 +694,10 @@ export function MainTabs({ onRequestAuth }: Props) {
               onEditarConvocados={(d) => {
                 setCalendarOpen(false);
                 void startInscribir(d);
+              }}
+              onOpenReserva={(r) => {
+                setCalendarOpen(false);
+                setReservaDetalle(r);
               }}
             />
           </View>
@@ -685,6 +762,13 @@ export function MainTabs({ onRequestAuth }: Props) {
             }}
             onRequestAuth={onRequestAuth}
             onOpenDesafio={openDesafio}
+            onArmarPlus={(turnoId) => {
+              const canchaId = reservePrefill?.canchaId;
+              void queueOrRun(
+                { kind: "reserva_plus", canchaId, turnoId },
+                () => setReservaPlus({ kind: "plus", canchaId, turnoId })
+              );
+            }}
             onDone={() => {
               setReservePrefill(null);
               setExploreView("hub");
@@ -722,9 +806,10 @@ export function MainTabs({ onRequestAuth }: Props) {
               setExploreView("reservar");
             }}
             onArmar={() => {
-              void queueOrRun({ kind: "crear_partido" }, () => setCrearPartidoOpen(true));
+              void queueOrRun({ kind: "reserva_plus" }, () => setReservaPlus({ kind: "plus" }));
             }}
             onOpenDesafio={openDesafio}
+            onOpenReserva={(r) => setReservaDetalle(r)}
             onVerPartidos={() => {
               setPreferMap(false);
               setTab("matches");
@@ -754,7 +839,9 @@ export function MainTabs({ onRequestAuth }: Props) {
       !inscribir &&
       !calendarOpen &&
       !listaReservaId &&
+      !reservaDetalle &&
       !crearPartidoOpen &&
+      !reservaPlus &&
       exploreView !== "reservar" &&
       exploreView !== "predio" &&
       !plusSearch &&
@@ -803,14 +890,21 @@ export function MainTabs({ onRequestAuth }: Props) {
         }}
         onArmarPartido={() => {
           setPlusOpen(false);
-          void queueOrRun({ kind: "crear_partido" }, () => setCrearPartidoOpen(true));
+          void queueOrRun({ kind: "reserva_plus" }, () => setReservaPlus({ kind: "plus" }));
         }}
         onCompletarPartido={
           completarReservaId
             ? () => {
                 const id = completarReservaId;
                 setPlusOpen(false);
-                void queueOrRun({ kind: "lista_reserva", reservaId: id }, () => setListaReservaId(id));
+                void listarMisReservas().then((r) => {
+                  const found = r.data.find((x) => x.id === id) ?? null;
+                  if (found) {
+                    setReservaDetalle(found);
+                    return;
+                  }
+                  void queueOrRun({ kind: "lista_reserva", reservaId: id }, () => setListaReservaId(id));
+                });
               }
             : undefined
         }

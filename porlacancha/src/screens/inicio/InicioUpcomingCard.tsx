@@ -38,14 +38,20 @@ export function InicioUpcomingMatchCard({
   );
 }
 
-export function InicioUpcomingReservaCard({ reserva }: { reserva: ReservaMia }) {
+export function InicioUpcomingReservaCard({
+  reserva,
+  onPress,
+}: {
+  reserva: ReservaMia;
+  onPress?: () => void;
+}) {
   const tone = reserva.estado === "reservada" ? "gold" : reserva.estado === "cancelada" ? "cancelled" : "pending";
-  return (
-    <View style={styles.card}>
+  const body = (
+    <>
       <View style={styles.head}>
         <Text style={styles.dia}>{formatFechaCorta(reserva.fecha).toUpperCase()}</Text>
         <Text style={styles.hora}>{formatHora(reserva.hora_inicio)}</Text>
-        <Chip label={etiquetaEstadoReserva(reserva.estado)} tone={tone} />
+        <Chip label={etiquetaEstadoReserva(reserva.estado, reserva.convertida_a_plus)} tone={tone} />
       </View>
       <View style={styles.resRow}>
         <PitchCover height={56} width={56} variant="thumb" />
@@ -59,7 +65,13 @@ export function InicioUpcomingReservaCard({ reserva }: { reserva: ReservaMia }) 
           </Text>
         </View>
       </View>
-    </View>
+    </>
+  );
+  if (!onPress) return <View style={styles.card}>{body}</View>;
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" style={styles.card}>
+      {body}
+    </Pressable>
   );
 }
 

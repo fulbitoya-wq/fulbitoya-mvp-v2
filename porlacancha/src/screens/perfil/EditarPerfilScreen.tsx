@@ -358,6 +358,9 @@ export function EditarPerfilScreen({ profile, football, onBack, onSaved }: Props
           onChangeText={setNacimiento}
           placeholder="AAAA-MM-DD"
         />
+        <Text style={styles.hint}>
+          Privada (mín. 13 años). El DNI se carga en Configuración → Datos personales y no se puede cambiar después.
+        </Text>
         <LabelInput label="Zona" value={zona} onChangeText={setZona} placeholder="Palermo, CABA" />
 
         <Text style={styles.h2}>Mi perfil futbolero</Text>
