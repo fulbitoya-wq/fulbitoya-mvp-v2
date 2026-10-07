@@ -50,10 +50,12 @@ import { InicioScreen } from "./inicio/InicioScreen";
 import { PredioDetalleScreen } from "./predio/PredioDetalleScreen";
 import { ReservarCanchaScreen } from "./ReservarCanchaScreen";
 import { ReservaListaScreen } from "./ReservaListaScreen";
+import { ReservaDetalleScreen } from "./reserva/ReservaDetalleScreen";
 import { ReservaPlusWizard } from "./reserva/ReservaPlusWizard";
 import { ChevronLeft, iconStroke } from "../lib/icons";
 import type { SearchPlayer } from "../lib/player-search";
 import type { ReservaDraft } from "../lib/reserva-draft";
+import type { ReservaMia } from "../lib/reserva";
 
 type Tab = "explore" | "matches" | "teams" | "profile";
 type ExploreView = "hub" | "partidos" | "reservar" | "predio";
@@ -96,6 +98,7 @@ export function MainTabs({ onRequestAuth }: Props) {
   const [plusPlayer, setPlusPlayer] = useState<SearchPlayer | null>(null);
   const [crearPartidoOpen, setCrearPartidoOpen] = useState(false);
   const [reservaPlus, setReservaPlus] = useState<Partial<ReservaDraft> | null>(null);
+  const [reservaDetalle, setReservaDetalle] = useState<ReservaMia | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [listaReservaId, setListaReservaId] = useState<string | null>(null);
   const [completarReservaId, setCompletarReservaId] = useState<string | null>(null);
@@ -653,6 +656,25 @@ export function MainTabs({ onRequestAuth }: Props) {
               void getInscripcionMia(detalle.id, ids, profile?.id).then(setMia);
             }}
           />
+        ) : reservaDetalle ? (
+          <ReservaDetalleScreen
+            reservaId={reservaDetalle.id}
+            initial={reservaDetalle}
+            onBack={() => setReservaDetalle(null)}
+            onPasarAPlus={(reservaId) => {
+              setReservaDetalle(null);
+              void queueOrRun({ kind: "reserva_plus", fromReservaId: reservaId }, () =>
+                setReservaPlus({ kind: "plus", fromReservaId: reservaId })
+              );
+            }}
+            onOpenPredio={(canchaId) => {
+              setReservaDetalle(null);
+              setCalendarOpen(false);
+              setReservePrefill({ canchaId });
+              setExploreView("predio");
+              setTab("explore");
+            }}
+          />
         ) : listaReservaId ? (
           <ReservaListaScreen reservaId={listaReservaId} onBack={() => setListaReservaId(null)} />
         ) : calendarOpen ? (
@@ -673,11 +695,9 @@ export function MainTabs({ onRequestAuth }: Props) {
                 setCalendarOpen(false);
                 void startInscribir(d);
               }}
-              onPasarAPlus={(reservaId) => {
+              onOpenReserva={(r) => {
                 setCalendarOpen(false);
-                void queueOrRun({ kind: "reserva_plus", fromReservaId: reservaId }, () =>
-                  setReservaPlus({ kind: "plus", fromReservaId: reservaId })
-                );
+                setReservaDetalle(r);
               }}
             />
           </View>
@@ -789,6 +809,7 @@ export function MainTabs({ onRequestAuth }: Props) {
               void queueOrRun({ kind: "reserva_plus" }, () => setReservaPlus({ kind: "plus" }));
             }}
             onOpenDesafio={openDesafio}
+            onOpenReserva={(r) => setReservaDetalle(r)}
             onVerPartidos={() => {
               setPreferMap(false);
               setTab("matches");
@@ -818,6 +839,7 @@ export function MainTabs({ onRequestAuth }: Props) {
       !inscribir &&
       !calendarOpen &&
       !listaReservaId &&
+      !reservaDetalle &&
       !crearPartidoOpen &&
       !reservaPlus &&
       exploreView !== "reservar" &&
@@ -875,7 +897,14 @@ export function MainTabs({ onRequestAuth }: Props) {
             ? () => {
                 const id = completarReservaId;
                 setPlusOpen(false);
-                void queueOrRun({ kind: "lista_reserva", reservaId: id }, () => setListaReservaId(id));
+                void listarMisReservas().then((r) => {
+                  const found = r.data.find((x) => x.id === id) ?? null;
+                  if (found) {
+                    setReservaDetalle(found);
+                    return;
+                  }
+                  void queueOrRun({ kind: "lista_reserva", reservaId: id }, () => setListaReservaId(id));
+                });
               }
             : undefined
         }
