@@ -451,7 +451,12 @@ export function PredioDetalleScreen({
                 accessibilityRole="button"
                 accessibilityLabel={fav ? "Quitar de favoritos" : "Favorito"}
               >
-                <Heart color={fav ? colors.gold : colors.white} size={18} strokeWidth={iconStroke} />
+                <Heart
+                  color={fav ? colors.gold : colors.white}
+                  fill={fav ? colors.gold : "transparent"}
+                  size={18}
+                  strokeWidth={iconStroke}
+                />
               </Pressable>
             </View>
           </View>
