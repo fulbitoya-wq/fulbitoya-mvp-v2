@@ -68,23 +68,34 @@ function profileFromUser(
   };
 }
 
-async function loadEdadPrivada(_userId: string): Promise<{ fecha_nacimiento: string | null; tiene_dni: boolean }> {
-  // No lee la columna dni: solo flags vía RPC (el número nunca entra al cliente de auth).
+async function loadEdadPrivada(userId: string): Promise<{ fecha_nacimiento: string | null; tiene_dni: boolean }> {
+  // Preferir RPC: no trae el número de DNI al cliente.
   const { data, error } = await supabase.rpc("plc_mi_estado_edad");
-  if (error || !data || typeof data !== "object") {
-    return { fecha_nacimiento: null, tiene_dni: false };
+  if (!error && data && typeof data === "object") {
+    const row = data as {
+      ok?: boolean;
+      fecha_nacimiento?: string | null;
+      tiene_dni?: boolean;
+    };
+    if (row.ok !== false) {
+      const fn =
+        row.fecha_nacimiento != null && String(row.fecha_nacimiento).trim()
+          ? String(row.fecha_nacimiento).slice(0, 10)
+          : null;
+      return { fecha_nacimiento: fn, tiene_dni: Boolean(row.tiene_dni) };
+    }
   }
-  const row = data as {
-    ok?: boolean;
-    fecha_nacimiento?: string | null;
-    tiene_dni?: boolean;
-  };
-  if (row.ok === false) return { fecha_nacimiento: null, tiene_dni: false };
+  // Fallback pre-migración: solo fecha (nunca dni).
+  const { data: jp } = await supabase
+    .from("jugador_perfiles")
+    .select("fecha_nacimiento")
+    .eq("usuario_id", userId)
+    .maybeSingle();
   const fn =
-    row.fecha_nacimiento != null && String(row.fecha_nacimiento).trim()
-      ? String(row.fecha_nacimiento).slice(0, 10)
+    jp?.fecha_nacimiento != null && String(jp.fecha_nacimiento).trim()
+      ? String(jp.fecha_nacimiento).slice(0, 10)
       : null;
-  return { fecha_nacimiento: fn, tiene_dni: Boolean(row.tiene_dni) };
+  return { fecha_nacimiento: fn, tiene_dni: false };
 }
 
 async function loadProfile(user: User): Promise<JugateLaProfile> {
