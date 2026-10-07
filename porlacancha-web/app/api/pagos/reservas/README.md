@@ -59,7 +59,24 @@ Más escenarios: [tarjetas de prueba](https://www.mercadopago.com.ar/developers/
 5. En la app → Mis partidos / detalle de reserva → **Cancelar** (con anticipación suficiente para reembolso total).  
    Si el pago fue real (no `prueba-res-…`), la API llama al reembolso de MP.
 
-### 5) Si falla
+### 5) Script automático
+
+Desde la raíz del repo (con env cargado):
+
+```bash
+export PLC_MERCADOPAGO_ACCESS_TOKEN=TEST-…
+export SUPABASE_SERVICE_ROLE_KEY=…
+export NEXT_PUBLIC_SUPABASE_URL=https://….supabase.co
+export PLC_WEB_URL=https://porlacancha.com
+export PLC_TEST_HOLD_ID=<uuid de un hold vivo>
+# o: PLC_TEST_USUARIO_ID + PLC_TEST_DISPONIBILIDAD_ID
+
+npm run prueba:mp-pago
+```
+
+El script: tokeniza tarjeta APRO → crea pago en MP → POST al webhook → verifica reserva `reservada` → reembolsa.
+
+### 6) Si falla
 
 | Síntoma | Qué mirar |
 |---|---|
