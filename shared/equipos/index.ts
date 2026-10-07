@@ -37,6 +37,7 @@ export {
   rpcCorrerTareaPeriodicaPlc,
   rpcListarPrediosPublicos,
   rpcCotizarReserva,
+  rpcOpcionesCobroReserva,
   rpcIniciarCheckoutReserva,
   rpcConfirmarPagoReservaPrueba,
   rpcCancelarReservaPlc,

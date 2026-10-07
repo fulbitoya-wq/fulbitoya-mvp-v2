@@ -7,6 +7,7 @@ import {
   rpcConfirmarPagoReservaPrueba,
   rpcCotizarEnlacePago,
   rpcCotizarReserva,
+  rpcOpcionesCobroReserva,
   rpcGuardarListaReserva,
   rpcIniciarCheckoutEnlace,
   rpcIniciarCheckoutReserva,
@@ -37,11 +38,48 @@ export type CotizacionReserva = {
   descuento: number;
   descuento_pct: number;
   monto_pagar: number;
+  resta_en_predio: number;
   texto_reglas: string;
+  texto_cancelacion: string;
   cancha_nombre: string;
   campo_nombre: string;
+  formato: string;
   fecha: string;
   hora_inicio: string;
+  barrio: string | null;
+  direccion: string | null;
+  slug: string | null;
+  acepta_sena: boolean;
+  acepta_total: boolean;
+};
+
+export type OpcionCobro = {
+  disponible: boolean;
+  monto_pagar: number | null;
+  resta_en_predio: number | null;
+  descuento: number;
+  descuento_pct: number;
+  precio_sin_descuento: number | null;
+  aclaracion: string | null;
+};
+
+export type OpcionesCobroReserva = {
+  cancha_nombre: string;
+  campo_nombre: string;
+  formato: string;
+  fecha: string;
+  hora_inicio: string;
+  barrio: string | null;
+  direccion: string | null;
+  slug: string | null;
+  precio_cancha: number;
+  sena: number;
+  acepta_sena: boolean;
+  acepta_total: boolean;
+  texto_cancelacion: string;
+  texto_reglas: string;
+  opcion_sena: OpcionCobro;
+  opcion_total: OpcionCobro;
 };
 
 export type AlternativaTurno = {
@@ -149,25 +187,81 @@ export async function listarTurnosDePredio(canchaId: string): Promise<TurnoPubli
     }));
 }
 
+function mapOpcion(raw: unknown, fallbackPrecio: number): OpcionCobro {
+  const row = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    disponible: bool(row.disponible),
+    monto_pagar: row.monto_pagar == null ? null : num(row.monto_pagar),
+    resta_en_predio: row.resta_en_predio == null ? null : num(row.resta_en_predio),
+    descuento: num(row.descuento),
+    descuento_pct: num(row.descuento_pct),
+    precio_sin_descuento: row.precio_sin_descuento == null ? fallbackPrecio : num(row.precio_sin_descuento),
+    aclaracion: row.aclaracion == null || str(row.aclaracion) === "" ? null : str(row.aclaracion),
+  };
+}
+
+function mapCotizacion(res: Record<string, unknown>): CotizacionReserva {
+  return {
+    tipo_cobro: str(res.tipo_cobro),
+    precio_cancha: num(res.precio_cancha),
+    sena: num(res.sena),
+    descuento: num(res.descuento),
+    descuento_pct: num(res.descuento_pct),
+    monto_pagar: num(res.monto_pagar),
+    resta_en_predio: num(res.resta_en_predio),
+    texto_reglas: str(res.texto_reglas),
+    texto_cancelacion: str(res.texto_cancelacion || res.texto_reglas),
+    cancha_nombre: str(res.cancha_nombre),
+    campo_nombre: str(res.campo_nombre),
+    formato: str(res.formato),
+    fecha: str(res.fecha),
+    hora_inicio: str(res.hora_inicio),
+    barrio: res.barrio == null || str(res.barrio) === "" ? null : str(res.barrio),
+    direccion: res.direccion == null || str(res.direccion) === "" ? null : str(res.direccion),
+    slug: res.slug == null || str(res.slug) === "" ? null : str(res.slug),
+    acepta_sena: bool(res.acepta_sena),
+    acepta_total: res.acepta_total == null ? true : bool(res.acepta_total),
+  };
+}
+
 export async function cotizarReserva(turnoId: string, tipo: "sena" | "total") {
   const res = await rpcCotizarReserva(supabase, turnoId, tipo);
   if (!res.ok) return { ok: false as const, error: err(res.error) };
+  return { ok: true as const, cot: mapCotizacion(res) };
+}
+
+export async function opcionesCobroReserva(turnoId: string) {
+  const res = await rpcOpcionesCobroReserva(supabase, turnoId);
+  if (!res.ok) return { ok: false as const, error: err(res.error) };
+  const precio = num(res.precio_cancha);
   return {
     ok: true as const,
-    cot: {
-      tipo_cobro: str(res.tipo_cobro),
-      precio_cancha: num(res.precio_cancha),
-      sena: num(res.sena),
-      descuento: num(res.descuento),
-      descuento_pct: num(res.descuento_pct),
-      monto_pagar: num(res.monto_pagar),
-      texto_reglas: str(res.texto_reglas),
+    data: {
       cancha_nombre: str(res.cancha_nombre),
       campo_nombre: str(res.campo_nombre),
+      formato: str(res.formato),
       fecha: str(res.fecha),
       hora_inicio: str(res.hora_inicio),
-    } satisfies CotizacionReserva,
+      barrio: res.barrio == null || str(res.barrio) === "" ? null : str(res.barrio),
+      direccion: res.direccion == null || str(res.direccion) === "" ? null : str(res.direccion),
+      slug: res.slug == null || str(res.slug) === "" ? null : str(res.slug),
+      precio_cancha: precio,
+      sena: num(res.sena),
+      acepta_sena: bool(res.acepta_sena),
+      acepta_total: res.acepta_total == null ? true : bool(res.acepta_total),
+      texto_cancelacion: str(res.texto_cancelacion || res.texto_reglas),
+      texto_reglas: str(res.texto_reglas),
+      opcion_sena: mapOpcion(res.opcion_sena, precio),
+      opcion_total: mapOpcion(res.opcion_total, precio),
+    } satisfies OpcionesCobroReserva,
   };
+}
+
+export function reglasPredioUrl(slug: string | null | undefined): string | null {
+  if (!slug) return null;
+  const web = webBaseUrl();
+  if (!web) return null;
+  return `${web}/p/${encodeURIComponent(slug)}`;
 }
 
 export type PagoIniciado =
@@ -276,22 +370,7 @@ export async function verEnlacePago(token: string) {
 export async function cotizarEnlacePago(token: string, tipo: "sena" | "total") {
   const res = await rpcCotizarEnlacePago(supabase, token, tipo);
   if (!res.ok) return { ok: false as const, error: err(res.error) };
-  return {
-    ok: true as const,
-    cot: {
-      tipo_cobro: str(res.tipo_cobro),
-      precio_cancha: num(res.precio_cancha),
-      sena: num(res.sena),
-      descuento: num(res.descuento),
-      descuento_pct: num(res.descuento_pct),
-      monto_pagar: num(res.monto_pagar),
-      texto_reglas: str(res.texto_reglas),
-      cancha_nombre: str(res.cancha_nombre),
-      campo_nombre: str(res.campo_nombre),
-      fecha: str(res.fecha),
-      hora_inicio: str(res.hora_inicio),
-    } satisfies CotizacionReserva,
-  };
+  return { ok: true as const, cot: mapCotizacion(res) };
 }
 
 export async function pagarEnlacePago(

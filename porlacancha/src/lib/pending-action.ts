@@ -12,7 +12,13 @@ export type PendingAction =
   | { kind: "accept_invite"; solicitudId: string }
   | { kind: "inscribir"; desafioId: string }
   | { kind: "favorite"; jugadorId: string }
-  | { kind: "reservar"; canchaId?: string; turnoId?: string }
+  | {
+      kind: "reservar";
+      canchaId?: string;
+      turnoId?: string;
+      tipoCobro?: "sena" | "total";
+      acepto?: boolean;
+    }
   | { kind: "crear_partido" }
   | { kind: "lista_reserva"; reservaId: string }
   | { kind: "open_desafio"; desafioId: string }

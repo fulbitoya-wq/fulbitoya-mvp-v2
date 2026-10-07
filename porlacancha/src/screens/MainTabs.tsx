@@ -93,7 +93,12 @@ export function MainTabs({ onRequestAuth }: Props) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [listaReservaId, setListaReservaId] = useState<string | null>(null);
   const [completarReservaId, setCompletarReservaId] = useState<string | null>(null);
-  const [reservePrefill, setReservePrefill] = useState<{ canchaId?: string; turnoId?: string } | null>(null);
+  const [reservePrefill, setReservePrefill] = useState<{
+    canchaId?: string;
+    turnoId?: string;
+    tipoCobro?: "sena" | "total";
+    acepto?: boolean;
+  } | null>(null);
   const [inscribir, setInscribir] = useState<{ desafio: Desafio; existing: InscripcionMia | null } | null>(null);
   const [mia, setMia] = useState<InscripcionMia | null>(null);
   const resumedKey = useRef<string | null>(null);
@@ -324,7 +329,12 @@ export function MainTabs({ onRequestAuth }: Props) {
         return;
       }
       if (action.kind === "reservar") {
-        setReservePrefill({ canchaId: action.canchaId, turnoId: action.turnoId });
+        setReservePrefill({
+          canchaId: action.canchaId,
+          turnoId: action.turnoId,
+          tipoCobro: action.tipoCobro,
+          acepto: action.acepto,
+        });
         setExploreView("reservar");
         setTab("explore");
         return;
@@ -670,6 +680,8 @@ export function MainTabs({ onRequestAuth }: Props) {
             onRequestAuth={onRequestAuth}
             initialCanchaId={reservePrefill?.canchaId ?? null}
             initialTurnoId={reservePrefill?.turnoId ?? null}
+            initialTipoCobro={reservePrefill?.tipoCobro ?? null}
+            initialAcepto={reservePrefill?.acepto ?? false}
             onDone={() => {
               setReservePrefill(null);
               setExploreView("hub");
@@ -686,10 +698,8 @@ export function MainTabs({ onRequestAuth }: Props) {
             onOpenNotifs={loggedIn ? openNotifs : undefined}
             onRefresh={refreshDesafios}
             onReservar={() => {
-              void queueOrRun({ kind: "reservar" }, () => {
-                setReservePrefill(null);
-                setExploreView("reservar");
-              });
+              setReservePrefill(null);
+              setExploreView("reservar");
             }}
             onArmar={() => {
               void queueOrRun({ kind: "crear_partido" }, () => setCrearPartidoOpen(true));
@@ -704,10 +714,8 @@ export function MainTabs({ onRequestAuth }: Props) {
               setCalendarOpen(true);
             }}
             onReservarTurno={(canchaId, turnoId) => {
-              void queueOrRun({ kind: "reservar", canchaId, turnoId }, () => {
-                setReservePrefill({ canchaId, turnoId });
-                setExploreView("reservar");
-              });
+              setReservePrefill({ canchaId, turnoId });
+              setExploreView("reservar");
             }}
             onRequestAuth={onRequestAuth}
             onOpenZona={() => {
@@ -764,11 +772,9 @@ export function MainTabs({ onRequestAuth }: Props) {
         onClose={() => setPlusOpen(false)}
         onReservarCancha={() => {
           setPlusOpen(false);
-          void queueOrRun({ kind: "reservar" }, () => {
-            setReservePrefill(null);
-            setExploreView("reservar");
-            setTab("explore");
-          });
+          setReservePrefill(null);
+          setExploreView("reservar");
+          setTab("explore");
         }}
         onArmarPartido={() => {
           setPlusOpen(false);

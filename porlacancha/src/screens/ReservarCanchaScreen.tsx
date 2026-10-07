@@ -1,23 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, radius, space } from "@shared/design";
 import { useAuth } from "../auth/AuthProvider";
 import { formatFechaCorta, formatHora, etiquetaTipo } from "../lib/desafios";
+import { setPendingAction } from "../lib/pending-action";
 import type { TurnoPublico } from "../lib/plc";
 import {
-  cotizarReserva,
   listarPrediosPublicos,
   listarTurnosDePredio,
+  opcionesCobroReserva,
   pagarReserva,
   pesosReserva,
-  type CotizacionReserva,
+  type OpcionesCobroReserva,
   type PredioPublico,
 } from "../lib/reserva";
 import { ChevronLeft, iconStroke } from "../lib/icons";
 import { Button, EmptyState, IconBtn, Mute, showNotice } from "../ui";
 import { PagoQrCard } from "../ui/PagoQrCard";
 import { typeStyle } from "../ui/textStyle";
+import { ReservaPagoBlock } from "./reserva/ReservaPagoBlock";
+
+type TipoCobro = "sena" | "total";
 
 type Props = {
   onBack: () => void;
@@ -25,7 +29,17 @@ type Props = {
   onDone: () => void;
   initialCanchaId?: string | null;
   initialTurnoId?: string | null;
+  initialTipoCobro?: TipoCobro | null;
+  initialAcepto?: boolean;
 };
+
+function onlyAvailable(op: OpcionesCobroReserva): TipoCobro | null {
+  const s = op.acepta_sena && op.opcion_sena.disponible;
+  const t = op.acepta_total && op.opcion_total.disponible;
+  if (s && !t) return "sena";
+  if (t && !s) return "total";
+  return null;
+}
 
 export function ReservarCanchaScreen({
   onBack,
@@ -33,6 +47,8 @@ export function ReservarCanchaScreen({
   onDone,
   initialCanchaId = null,
   initialTurnoId = null,
+  initialTipoCobro = null,
+  initialAcepto = false,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
@@ -40,12 +56,16 @@ export function ReservarCanchaScreen({
   const [canchaId, setCanchaId] = useState<string | null>(initialCanchaId);
   const [turnos, setTurnos] = useState<TurnoPublico[]>([]);
   const [turnoId, setTurnoId] = useState<string | null>(initialTurnoId);
-  const [tipo, setTipo] = useState<"sena" | "total">("sena");
-  const [cot, setCot] = useState<CotizacionReserva | null>(null);
-  const [acepto, setAcepto] = useState(false);
+  const [tipo, setTipo] = useState<TipoCobro | null>(initialTipoCobro);
+  const [opciones, setOpciones] = useState<OpcionesCobroReserva | null>(null);
+  const [opcionesLoading, setOpcionesLoading] = useState(false);
+  const [acepto, setAcepto] = useState(initialAcepto);
   const [busy, setBusy] = useState(false);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [qr, setQr] = useState<{ initPoint: string; holdId: string } | null>(null);
+  const [fecha, setFecha] = useState<string | null>(null);
+  const tipoRef = useRef<TipoCobro | null>(tipo);
+  tipoRef.current = tipo;
 
   useEffect(() => {
     void listarPrediosPublicos().then(({ data, error }) => {
@@ -58,29 +78,11 @@ export function ReservarCanchaScreen({
     if (!canchaId) {
       setTurnos([]);
       setTurnoId(null);
+      setFecha(null);
       return;
     }
     void listarTurnosDePredio(canchaId).then(setTurnos);
   }, [canchaId]);
-
-  useEffect(() => {
-    if (!turnoId) {
-      setCot(null);
-      setAcepto(false);
-      return;
-    }
-    void cotizarReserva(turnoId, tipo).then((res) => {
-      if (!res.ok) {
-        setCot(null);
-        showNotice("No se pudo cotizar", res.error);
-        return;
-      }
-      setCot(res.cot);
-    });
-  }, [turnoId, tipo]);
-
-  const fechas = useMemo(() => [...new Set(turnos.map((t) => t.fecha))], [turnos]);
-  const [fecha, setFecha] = useState<string | null>(null);
 
   useEffect(() => {
     if (!initialTurnoId) return;
@@ -91,11 +93,70 @@ export function ReservarCanchaScreen({
       setTurnoId(t.id);
     }
   }, [turnos, initialTurnoId]);
+
+  const loadOpciones = useCallback(async (id: string, keepTipo: TipoCobro | null) => {
+    setOpcionesLoading(true);
+    const res = await opcionesCobroReserva(id);
+    setOpcionesLoading(false);
+    if (!res.ok) {
+      setOpciones(null);
+      showNotice("No se pudo cotizar", res.error);
+      return;
+    }
+    setOpciones(res.data);
+    const only = onlyAvailable(res.data);
+    if (only) {
+      setTipo(only);
+      return;
+    }
+    if (keepTipo === "sena" && res.data.opcion_sena.disponible) {
+      setTipo("sena");
+      return;
+    }
+    if (keepTipo === "total" && res.data.opcion_total.disponible) {
+      setTipo("total");
+      return;
+    }
+    setTipo(null);
+  }, []);
+
+  useEffect(() => {
+    if (!turnoId) {
+      setOpciones(null);
+      setTipo(null);
+      setAcepto(false);
+      setQr(null);
+      return;
+    }
+    void loadOpciones(turnoId, tipoRef.current ?? initialTipoCobro);
+  }, [turnoId, loadOpciones, initialTipoCobro]);
+
+  const fechas = useMemo(() => [...new Set(turnos.map((t) => t.fecha))], [turnos]);
   const turnosDia = turnos.filter((t) => !fecha || t.fecha === fecha);
 
-  const pagar = async () => {
-    if (!turnoId || !acepto) return;
+  const canContinue = Boolean(turnoId && tipo && acepto && opciones && !busy && !qr);
+
+  const selectFecha = (f: string) => {
+    setFecha(f);
+    setTurnoId(null);
+    setQr(null);
+  };
+
+  const selectTurno = (id: string) => {
+    setTurnoId(id);
+    setQr(null);
+  };
+
+  const continuar = async () => {
+    if (!turnoId || !tipo || !acepto) return;
     if (!session?.access_token) {
+      await setPendingAction({
+        kind: "reservar",
+        canchaId: canchaId ?? undefined,
+        turnoId,
+        tipoCobro: tipo,
+        acepto: true,
+      });
       onRequestAuth();
       return;
     }
@@ -115,9 +176,11 @@ export function ReservarCanchaScreen({
       setQr({ initPoint: res.initPoint, holdId: res.holdId });
       return;
     }
-    showNotice("Mercado Pago", "Te llevamos a pagar. El turno se confirma cuando se aprueba el pago.");
+    showNotice("Mercado Pago", "Te llevamos a pagar. Tenés 10 minutos para confirmar el turno.");
     onDone();
   };
+
+  const footerH = 72 + Math.max(insets.bottom, space[8]);
 
   return (
     <View style={styles.fill}>
@@ -128,12 +191,29 @@ export function ReservarCanchaScreen({
         <Text style={styles.title}>Reservar cancha</Text>
         <View style={{ width: 48 }} />
       </View>
-      <ScrollView contentContainerStyle={{ padding: space[16], paddingBottom: insets.bottom + 40 }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: space[16],
+          paddingBottom: footerH + space[16],
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.h}>Predio</Text>
         {loadErr ? <Mute>{loadErr}</Mute> : null}
-        {predios.length === 0 ? <EmptyState title="No hay turnos" body="Todavía no hay predios con horarios libres." /> : null}
+        {predios.length === 0 ? (
+          <EmptyState title="No hay turnos" body="Todavía no hay predios con horarios libres." />
+        ) : null}
         {predios.map((p) => (
-          <Pressable key={p.id} onPress={() => setCanchaId(p.id)} style={[styles.card, canchaId === p.id && styles.cardOn]}>
+          <Pressable
+            key={p.id}
+            onPress={() => {
+              setCanchaId(p.id);
+              setFecha(null);
+              setTurnoId(null);
+              setQr(null);
+            }}
+            style={[styles.card, canchaId === p.id && styles.cardOn]}
+          >
             <Text style={styles.body}>{p.nombre}</Text>
             <Mute>{p.barrio || p.direccion || ""}</Mute>
           </Pressable>
@@ -144,14 +224,23 @@ export function ReservarCanchaScreen({
             <Text style={[styles.h, { marginTop: space[16] }]}>Día</Text>
             <View style={styles.wrap}>
               {fechas.slice(0, 14).map((f) => (
-                <Pressable key={f} onPress={() => setFecha(f)} style={[styles.chip, fecha === f && styles.chipOn]}>
+                <Pressable
+                  key={f}
+                  onPress={() => selectFecha(f)}
+                  style={[styles.chip, fecha === f && styles.chipOn]}
+                >
                   <Text style={styles.chipT}>{formatFechaCorta(f)}</Text>
                 </Pressable>
               ))}
             </View>
-            <Text style={[styles.h, { marginTop: space[16] }]}>Turno</Text>
+            <Text style={[styles.h, { marginTop: space[16] }]}>Horario</Text>
+            {turnosDia.length === 0 ? <Mute>Elegí un día para ver horarios.</Mute> : null}
             {turnosDia.map((t) => (
-              <Pressable key={t.id} onPress={() => setTurnoId(t.id)} style={[styles.card, turnoId === t.id && styles.cardOn]}>
+              <Pressable
+                key={t.id}
+                onPress={() => selectTurno(t.id)}
+                style={[styles.card, turnoId === t.id && styles.cardOn]}
+              >
                 <Text style={styles.body}>
                   {t.campo_nombre} · {etiquetaTipo(t.campo_tipo)} · {formatHora(t.hora_inicio)}
                 </Text>
@@ -161,58 +250,49 @@ export function ReservarCanchaScreen({
           </>
         ) : null}
 
-        {turnoId ? (
-          <>
-            <Text style={[styles.h, { marginTop: space[16] }]}>Cómo pagás</Text>
-            <View style={styles.wrap}>
-              <Pressable onPress={() => setTipo("sena")} style={[styles.chip, tipo === "sena" && styles.chipOn]}>
-                <Text style={styles.chipT}>Seña</Text>
-              </Pressable>
-              <Pressable onPress={() => setTipo("total")} style={[styles.chip, tipo === "total" && styles.chipOn]}>
-                <Text style={styles.chipT}>Total adelantado</Text>
-              </Pressable>
-            </View>
-            {cot ? (
-              <View style={{ marginTop: space[12], gap: space[6] }}>
-                <Mute>Cancha {pesosReserva(cot.precio_cancha)} · seña {pesosReserva(cot.sena)}</Mute>
-                {tipo === "total" && cot.descuento > 0 ? (
-                  <Mute>Descuento por pagar el total: {pesosReserva(cot.descuento)}</Mute>
-                ) : null}
-                <Text style={styles.pay}>A pagar {pesosReserva(cot.monto_pagar)}</Text>
-                <View style={styles.rules}>
-                  <Text style={styles.rulesT}>{cot.texto_reglas}</Text>
-                </View>
-                <Pressable onPress={() => setAcepto((v) => !v)} style={styles.row}>
-                  <View style={[styles.box, acepto && styles.boxOn]} />
-                  <Text style={styles.body}>Acepto las reglas de cancelación y de seña.</Text>
-                </Pressable>
-                {qr && session?.access_token ? (
-                  <PagoQrCard
-                    initPoint={qr.initPoint}
-                    holdId={qr.holdId}
-                    accessToken={session.access_token}
-                    onConfirmada={() => {
-                      showNotice("Reserva", "El pago se confirmó. El turno quedó reservado.");
-                      onDone();
-                    }}
-                    onVencida={() => {
-                      setQr(null);
-                      showNotice("Pago", "Se venció el tiempo para pagar. El turno volvió a quedar libre.");
-                    }}
-                  />
-                ) : (
-                <Button
-                  label={busy ? "Reservando..." : "Pagar y reservar"}
-                  onPress={() => void pagar()}
-                  disabled={!acepto || busy}
-                  loading={busy}
-                />
-                )}
-              </View>
-            ) : null}
-          </>
+        {turnoId && opcionesLoading ? <Mute>Calculando formas de pago…</Mute> : null}
+        {turnoId && opciones && !opcionesLoading ? (
+          <ReservaPagoBlock
+            opciones={opciones}
+            tipo={tipo}
+            acepto={acepto}
+            onSelectTipo={(t) => {
+              setTipo(t);
+              setQr(null);
+            }}
+            onToggleAcepto={() => setAcepto((v) => !v)}
+          />
+        ) : null}
+
+        {qr && session?.access_token ? (
+          <View style={{ marginTop: space[16] }}>
+            <PagoQrCard
+              initPoint={qr.initPoint}
+              holdId={qr.holdId}
+              accessToken={session.access_token}
+              onConfirmada={() => {
+                showNotice("Reserva", "El pago se confirmó. El turno quedó reservado.");
+                onDone();
+              }}
+              onVencida={() => {
+                setQr(null);
+                showNotice("Pago", "Se venció el tiempo para pagar. El turno volvió a quedar libre.");
+              }}
+            />
+          </View>
         ) : null}
       </ScrollView>
+
+      {!qr ? (
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space[8]) }]}>
+          <Button
+            label={busy ? "Continuando..." : "Continuar →"}
+            onPress={() => void continuar()}
+            disabled={!canContinue}
+            loading={busy}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -223,7 +303,6 @@ const styles = StyleSheet.create({
   title: { ...typeStyle("h3", colors.white), flex: 1, textAlign: "center" },
   h: typeStyle("h3", colors.white),
   body: typeStyle("body", colors.white),
-  pay: typeStyle("numM", colors.gold),
   card: {
     minHeight: 48,
     borderWidth: 1,
@@ -244,15 +323,15 @@ const styles = StyleSheet.create({
   },
   chipOn: { borderColor: colors.gold },
   chipT: typeStyle("bodySmall", colors.white),
-  rules: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: space[12],
-    backgroundColor: colors.surface,
+  footer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: space[16],
+    paddingTop: space[8],
+    backgroundColor: colors.navy,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  rulesT: typeStyle("bodySmall", colors.textSecondary),
-  row: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: space[12] },
-  box: { width: 22, height: 22, borderRadius: 4, borderWidth: 2, borderColor: colors.gold },
-  boxOn: { backgroundColor: colors.gold },
 });

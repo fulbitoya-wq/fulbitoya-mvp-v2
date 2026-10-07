@@ -359,6 +359,15 @@ export async function rpcCotizarReserva(
   });
 }
 
+export async function rpcOpcionesCobroReserva(
+  client: EquiposRpcClient,
+  disponibilidadId: string
+): Promise<RpcResult<Record<string, unknown>>> {
+  return call(client, "plc_opciones_cobro_reserva", {
+    p_disponibilidad_id: disponibilidadId,
+  });
+}
+
 export async function rpcIniciarCheckoutReserva(
   client: EquiposRpcClient,
   disponibilidadId: string,
