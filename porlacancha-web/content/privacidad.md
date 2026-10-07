@@ -16,7 +16,7 @@ Según cómo uses el servicio, podemos tratar:
 - Datos de pagos: si hay un cobro de inscripción, el procesador de pagos (por ejemplo Mercado Pago) trata datos de cobro. Nosotros guardamos el estado del pago asociado a tu inscripción, no el número completo de tu tarjeta.
 - Solicitudes de baja: si pedís borrar la cuenta desde este sitio, registramos el email de la solicitud para procesarla.
 
-No pedimos DNI en PorLaCancha salvo que una función futura de verificación lo requiera y te lo avisemos.
+Pedimos fecha de nacimiento a todos al registrarse (mínimo 13 años). El DNI solo se pide si vas a crear, aceptar o pagar un desafío por la cancha (mayores de 18). El DNI no aparece en perfiles ni búsquedas públicas.
 
 ## Para qué los usamos
 

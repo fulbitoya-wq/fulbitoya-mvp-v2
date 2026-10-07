@@ -7,9 +7,11 @@ import { rememberJoinTokenFromUrl } from "../lib/join-token";
 import {
   clearPendingAction,
   peekPendingAction,
+  profileNeedsBirthdate,
   profileNeedsPhone,
   profileNeedsUsername,
 } from "../lib/pending-action";
+import { CompleteBirthdateScreen } from "./auth/CompleteBirthdateScreen";
 import { CompletePhoneScreen } from "./auth/CompletePhoneScreen";
 import { CompleteUsernameScreen } from "./auth/CompleteUsernameScreen";
 import { MainTabs } from "./MainTabs";
@@ -21,7 +23,7 @@ type Props = {
 
 export function LoggedInShell({ onRequestAuth }: Props) {
   const { session, profile } = useAuth();
-  const [gate, setGate] = useState<null | "username" | "phone">(null);
+  const [gate, setGate] = useState<null | "username" | "phone" | "birthdate">(null);
   const [claimToken, setClaimToken] = useState<string | null>(null);
   const triedJoin = useRef<string | null>(null);
   const askedAuthForClaim = useRef(false);
@@ -76,6 +78,10 @@ export function LoggedInShell({ onRequestAuth }: Props) {
         setGate("phone");
         return;
       }
+      if (mustComplete && profileNeedsBirthdate(profile)) {
+        setGate("birthdate");
+        return;
+      }
       setGate(null);
       if (action.kind !== "join_token") return;
       if (triedJoin.current === action.token) return;
@@ -96,7 +102,7 @@ export function LoggedInShell({ onRequestAuth }: Props) {
       cancelled = true;
       sub.remove();
     };
-  }, [session, profile, profile?.username, profile?.telefono]);
+  }, [session, profile, profile?.username, profile?.telefono, profile?.fecha_nacimiento]);
 
   if (session && claimToken) {
     return (
@@ -119,6 +125,9 @@ export function LoggedInShell({ onRequestAuth }: Props) {
   }
   if (session && gate === "phone") {
     return <CompletePhoneScreen />;
+  }
+  if (session && gate === "birthdate") {
+    return <CompleteBirthdateScreen />;
   }
 
   return <MainTabs onRequestAuth={onRequestAuth} />;

@@ -15,6 +15,7 @@ export default function RegistroPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -52,6 +53,7 @@ export default function RegistroPage() {
       email,
       password,
       telefono,
+      fechaNacimiento,
     });
     if (!parsed.success) {
       setError(firstZodError(parsed.error));
@@ -67,6 +69,7 @@ export default function RegistroPage() {
           nombre: parsed.data.nombre,
           telefono: parsed.data.telefono,
           origen_registro: "fulbitoya",
+          fecha_nacimiento: parsed.data.fechaNacimiento,
         },
       },
     });
@@ -74,6 +77,11 @@ export default function RegistroPage() {
     setLoading(false);
 
     if (signUpError) {
+      const msg = signUpError.message.toLowerCase();
+      if (msg.includes("menor_13")) {
+        setError("Tenés que tener al menos 13 años para crear una cuenta.");
+        return;
+      }
       setError(signUpError.message);
       return;
     }
@@ -126,6 +134,16 @@ export default function RegistroPage() {
             className="w-full rounded-lg border border-[#E0E0E0] px-4 py-3 focus:border-[#4CAF50] focus:outline-none focus:ring-1 focus:ring-[#4CAF50]"
             required
           />
+
+          <input
+            type="date"
+            placeholder="Fecha de nacimiento"
+            value={fechaNacimiento}
+            onChange={(e) => setFechaNacimiento(e.target.value)}
+            className="w-full rounded-lg border border-[#E0E0E0] px-4 py-3 focus:border-[#4CAF50] focus:outline-none focus:ring-1 focus:ring-[#4CAF50]"
+            required
+          />
+          <p className="text-xs text-[#1A2E4A]/60">Mínimo 13 años. No se muestra en perfiles públicos.</p>
 
           <input
             type="tel"

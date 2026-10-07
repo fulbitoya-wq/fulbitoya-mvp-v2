@@ -16,6 +16,7 @@ import {
 import {
   clearPendingAction,
   peekPendingAction,
+  profileNeedsBirthdate,
   profileNeedsPhone,
   profileNeedsUsername,
   profileReadyForActions,
@@ -27,6 +28,7 @@ import { mensajeErrorEquipo, rpcPredioPublico, rpcResponderSolicitud } from "@sh
 import { listarMisReservas } from "../lib/reserva";
 import { IconBtn, showNotice } from "../ui";
 import { PorLaCanchaBottomTabBar } from "../ui/PorLaCanchaBottomTabBar";
+import { CompleteBirthdateScreen } from "./auth/CompleteBirthdateScreen";
 import { CompletePhoneScreen } from "./auth/CompletePhoneScreen";
 import { CompleteUsernameScreen } from "./auth/CompleteUsernameScreen";
 import { ExplorarScreen } from "./ExplorarScreen";
@@ -81,7 +83,7 @@ export function MainTabs({ onRequestAuth }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hideProfileNav, setHideProfileNav] = useState(false);
-  const [profileGate, setProfileGate] = useState<null | "username" | "phone">(null);
+  const [profileGate, setProfileGate] = useState<null | "username" | "phone" | "birthdate">(null);
   const [notifsOpen, setNotifsOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notificacion[]>([]);
   const [notifsLoading, setNotifsLoading] = useState(false);
@@ -263,6 +265,10 @@ export function MainTabs({ onRequestAuth }: Props) {
       setProfileGate("phone");
       return;
     }
+    if (profileNeedsBirthdate(profile)) {
+      setProfileGate("birthdate");
+      return;
+    }
     await clearPendingAction();
     await run();
   };
@@ -275,6 +281,10 @@ export function MainTabs({ onRequestAuth }: Props) {
     }
     if (profileNeedsPhone(profile)) {
       setProfileGate("phone");
+      return;
+    }
+    if (profileNeedsBirthdate(profile)) {
+      setProfileGate("birthdate");
       return;
     }
     setProfileGate(null);
@@ -493,6 +503,8 @@ export function MainTabs({ onRequestAuth }: Props) {
           <CompleteUsernameScreen />
         ) : loggedIn && profileGate === "phone" ? (
           <CompletePhoneScreen />
+        ) : loggedIn && profileGate === "birthdate" ? (
+          <CompleteBirthdateScreen />
         ) : inscribir ? (
           <InscribirEquipoScreen
             desafio={inscribir.desafio}

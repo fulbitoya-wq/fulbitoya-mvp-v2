@@ -78,6 +78,8 @@ export function CompletePhoneScreen() {
         rol: profile?.rol ?? "jugador",
         origen_registro: profile?.origen_registro ?? "porlacancha",
         avatar_url: profile?.avatar_url ?? null,
+        fecha_nacimiento: profile?.fecha_nacimiento ?? null,
+        tiene_dni: profile?.tiene_dni ?? false,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "No se pudo guardar.";

@@ -4,7 +4,7 @@ import { firstZodError, registerSchema } from "@shared/validation/auth";
 import { colors } from "@shared/design";
 import { supabase } from "../../lib/supabase";
 import { emailRedirectConfirm } from "../../lib/web-url";
-import { AuthScreen, BrandLogo, Button, Field, Heading } from "../../ui";
+import { AuthScreen, BrandLogo, Button, Field, Heading, Lead } from "../../ui";
 import { typeStyle } from "../../ui/textStyle";
 import { AuthBackBar } from "./AuthBackBar";
 import { AuthNoticeModal } from "./AuthNoticeModal";
@@ -12,10 +12,18 @@ import { SocialAuthButtons } from "./SocialAuthButtons";
 
 type Props = { onGoLogin: () => void; onSkip?: () => void };
 
+function mapSignupError(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("menor_13")) return "Tenés que tener al menos 13 años para crear una cuenta.";
+  if (m.includes("fecha_nacimiento")) return "Revisá la fecha de nacimiento (AAAA-MM-DD).";
+  return message;
+}
+
 export function RegisterScreen({ onGoLogin, onSkip }: Props) {
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -27,7 +35,7 @@ export function RegisterScreen({ onGoLogin, onSkip }: Props) {
 
   const submit = async () => {
     setError(null);
-    const parsed = registerSchema.safeParse({ nombre, email, password });
+    const parsed = registerSchema.safeParse({ nombre, email, password, fechaNacimiento });
     if (!parsed.success) {
       setError(firstZodError(parsed.error));
       return;
@@ -41,12 +49,13 @@ export function RegisterScreen({ onGoLogin, onSkip }: Props) {
         data: {
           nombre: parsed.data.nombre,
           origen_registro: "porlacancha",
+          fecha_nacimiento: parsed.data.fechaNacimiento,
         },
       },
     });
     setLoading(false);
     if (err) {
-      setError(err.message);
+      setError(mapSignupError(err.message));
       return;
     }
     setDone(true);
@@ -62,6 +71,7 @@ export function RegisterScreen({ onGoLogin, onSkip }: Props) {
       <AuthBackBar onBack={onGoLogin} label="Volver a ingresar" />
       <BrandLogo size="md" />
       <Heading>Crear cuenta</Heading>
+      <Lead>Desde los 13 años. La fecha de nacimiento no se muestra en tu perfil público.</Lead>
       <Field leftIcon="user" placeholder="Nombre" value={nombre} invalid={Boolean(error)} onChangeText={onChangeClear(setNombre)} />
       <Field
         leftIcon="mail"
@@ -71,6 +81,14 @@ export function RegisterScreen({ onGoLogin, onSkip }: Props) {
         value={email}
         invalid={Boolean(error)}
         onChangeText={onChangeClear(setEmail)}
+      />
+      <Field
+        placeholder="Fecha de nacimiento (AAAA-MM-DD)"
+        value={fechaNacimiento}
+        keyboardType="numbers-and-punctuation"
+        autoCapitalize="none"
+        invalid={Boolean(error)}
+        onChangeText={onChangeClear(setFechaNacimiento)}
       />
       <Field
         leftIcon="lock"

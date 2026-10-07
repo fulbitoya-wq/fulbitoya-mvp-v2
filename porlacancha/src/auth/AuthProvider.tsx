@@ -26,6 +26,10 @@ export type JugateLaProfile = {
   origen_registro: "fulbitoya" | "porlacancha" | null;
   avatar_url: string | null;
   created_at: string | null;
+  /** Privado: no se muestra en perfiles públicos. */
+  fecha_nacimiento: string | null;
+  /** True si hay DNI cargado; el número nunca viaja en el perfil de auth. */
+  tiene_dni: boolean;
 };
 
 type AuthContextValue = {
@@ -39,10 +43,16 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function profileFromUser(user: User, row: Partial<JugateLaProfile> | null): JugateLaProfile {
+function profileFromUser(
+  user: User,
+  row: Partial<JugateLaProfile> | null,
+  edad?: { fecha_nacimiento: string | null; tiene_dni: boolean }
+): JugateLaProfile {
   const meta = user.user_metadata ?? {};
   const metaNombre = typeof meta.nombre === "string" ? meta.nombre : null;
   const metaTel = typeof meta.telefono === "string" ? meta.telefono : null;
+  const metaFn =
+    typeof meta.fecha_nacimiento === "string" ? String(meta.fecha_nacimiento).slice(0, 10) : null;
   return {
     id: user.id,
     email: row?.email || user.email || "",
@@ -53,16 +63,40 @@ function profileFromUser(user: User, row: Partial<JugateLaProfile> | null): Juga
     origen_registro: row?.origen_registro ?? null,
     avatar_url: row?.avatar_url ?? null,
     created_at: row?.created_at ?? user.created_at ?? null,
+    fecha_nacimiento: edad?.fecha_nacimiento ?? row?.fecha_nacimiento ?? metaFn,
+    tiene_dni: edad?.tiene_dni ?? row?.tiene_dni ?? false,
   };
 }
 
+async function loadEdadPrivada(_userId: string): Promise<{ fecha_nacimiento: string | null; tiene_dni: boolean }> {
+  // No lee la columna dni: solo flags vía RPC (el número nunca entra al cliente de auth).
+  const { data, error } = await supabase.rpc("plc_mi_estado_edad");
+  if (error || !data || typeof data !== "object") {
+    return { fecha_nacimiento: null, tiene_dni: false };
+  }
+  const row = data as {
+    ok?: boolean;
+    fecha_nacimiento?: string | null;
+    tiene_dni?: boolean;
+  };
+  if (row.ok === false) return { fecha_nacimiento: null, tiene_dni: false };
+  const fn =
+    row.fecha_nacimiento != null && String(row.fecha_nacimiento).trim()
+      ? String(row.fecha_nacimiento).slice(0, 10)
+      : null;
+  return { fecha_nacimiento: fn, tiene_dni: Boolean(row.tiene_dni) };
+}
+
 async function loadProfile(user: User): Promise<JugateLaProfile> {
-  const { data } = await supabase
-    .from("usuarios")
-    .select("id, email, nombre, telefono, username, rol, origen_registro, avatar_url, created_at")
-    .eq("id", user.id)
-    .maybeSingle();
-  return profileFromUser(user, (data as JugateLaProfile | null) ?? null);
+  const [{ data }, edad] = await Promise.all([
+    supabase
+      .from("usuarios")
+      .select("id, email, nombre, telefono, username, rol, origen_registro, avatar_url, created_at")
+      .eq("id", user.id)
+      .maybeSingle(),
+    loadEdadPrivada(user.id),
+  ]);
+  return profileFromUser(user, (data as JugateLaProfile | null) ?? null, edad);
 }
 
 function mergeLoadedProfile(
@@ -79,6 +113,8 @@ function mergeLoadedProfile(
     avatar_url: row.avatar_url ?? prev.avatar_url,
     created_at: row.created_at ?? prev.created_at,
     origen_registro: row.origen_registro ?? prev.origen_registro,
+    fecha_nacimiento: row.fecha_nacimiento ?? prev.fecha_nacimiento,
+    tiene_dni: row.tiene_dni || prev.tiene_dni,
   };
 }
 

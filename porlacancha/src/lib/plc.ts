@@ -136,7 +136,13 @@ export async function crearPartidoPlc(input: {
   modalidad: PlcModalidad;
 }) {
   const res = await rpcCrearPartido(supabase, input);
-  if (!res.ok) return { ok: false as const, error: mensajeErrorEquipo(res.error, { minimo: res.minimo }) };
+  if (!res.ok) {
+    return {
+      ok: false as const,
+      error: mensajeErrorEquipo(res.error, { minimo: res.minimo, quienes: res.quienes }),
+      code: res.error,
+    };
+  }
   return {
     ok: true as const,
     desafioId: res.desafio_id,
@@ -164,7 +170,7 @@ export async function montoAPagar(inscripcionId: string) {
 
 export async function confirmarPagoPrueba(inscripcionId: string) {
   const res = await rpcConfirmarPagoPrueba(supabase, inscripcionId);
-  if (!res.ok) return { ok: false as const, error: err(res.error) };
+  if (!res.ok) return { ok: false as const, error: err(res.error), code: res.error };
   return { ok: true as const };
 }
 

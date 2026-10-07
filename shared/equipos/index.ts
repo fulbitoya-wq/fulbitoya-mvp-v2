@@ -58,6 +58,11 @@ export {
   rpcGuardarListaReserva,
   rpcListarListaReserva,
   rpcAbrirBuscaGente,
+  rpcMiEstadoEdad,
+  rpcGuardarFechaNacimiento,
+  rpcGuardarIdentidadDesafio,
+  esErrorIdentidadDesafio,
+  esErrorFaltaNacimiento,
   type EquiposRpcClient,
   type RpcResult,
 } from "./rpc";

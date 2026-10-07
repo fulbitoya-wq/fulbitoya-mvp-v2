@@ -27,7 +27,7 @@ const faqs = [
   },
   {
     q: "¿Hace falta ser mayor de edad?",
-    a: "Sí. Tenés que ser mayor de 18 años.",
+    a: "Podés crear cuenta desde los 13 años. Reservar cancha, abrir o sumarte a partidos también desde los 13. Los desafíos por la cancha (crear, aceptar o pagar) son solo para mayores de 18 con DNI y fecha de nacimiento cargados.",
   },
 ];
 

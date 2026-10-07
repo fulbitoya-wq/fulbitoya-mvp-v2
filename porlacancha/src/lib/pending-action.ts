@@ -32,8 +32,20 @@ export function profileNeedsPhone(profile: JugateLaProfile | null): boolean {
   return !profile?.telefono?.trim();
 }
 
+export function profileNeedsBirthdate(profile: JugateLaProfile | null): boolean {
+  return !profile?.fecha_nacimiento?.trim();
+}
+
+export function profileNeedsIdentidadDesafio(profile: JugateLaProfile | null): boolean {
+  return profileNeedsBirthdate(profile) || !profile?.tiene_dni;
+}
+
 export function profileReadyForActions(profile: JugateLaProfile | null): boolean {
-  return !profileNeedsUsername(profile) && !profileNeedsPhone(profile);
+  return (
+    !profileNeedsUsername(profile) &&
+    !profileNeedsPhone(profile) &&
+    !profileNeedsBirthdate(profile)
+  );
 }
 
 export async function setPendingAction(action: PendingAction): Promise<void> {

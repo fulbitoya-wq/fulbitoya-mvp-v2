@@ -580,3 +580,45 @@ export async function rpcAbrirBuscaGente(
   if (!res.ok) return res;
   return { ok: true, busca_gente: Boolean(res.busca_gente) };
 }
+
+export async function rpcMiEstadoEdad(
+  client: EquiposRpcClient
+): Promise<
+  RpcResult<{
+    fecha_nacimiento?: string | null;
+    tiene_dni?: boolean;
+    mayor_13?: boolean;
+    mayor_18?: boolean;
+    puede_desafio_cancha?: boolean;
+  }>
+> {
+  return call(client, "plc_mi_estado_edad", {});
+}
+
+export async function rpcGuardarFechaNacimiento(
+  client: EquiposRpcClient,
+  fechaNacimiento: string
+): Promise<RpcResult<{ fecha_nacimiento?: string }>> {
+  return call(client, "plc_guardar_fecha_nacimiento", { p_fecha_nacimiento: fechaNacimiento });
+}
+
+export async function rpcGuardarIdentidadDesafio(
+  client: EquiposRpcClient,
+  dni: string,
+  fechaNacimiento: string
+): Promise<RpcResult<{ puede_desafio_cancha?: boolean }>> {
+  return call(client, "plc_guardar_identidad_desafio", {
+    p_dni: dni,
+    p_fecha_nacimiento: fechaNacimiento,
+  });
+}
+
+/** Errores que piden cargar DNI/fecha y reintentar la acción de desafío por la cancha. */
+export function esErrorIdentidadDesafio(code: string | null | undefined): boolean {
+  return code === "falta_dni" || code === "falta_nacimiento" || code === "dni_invalido";
+}
+
+/** Errores que piden solo fecha de nacimiento (reserva / amistoso / registro). */
+export function esErrorFaltaNacimiento(code: string | null | undefined): boolean {
+  return code === "falta_nacimiento";
+}

@@ -241,7 +241,7 @@ export function ConfiguracionScreen({ profile, football, email, onBack, onEdit, 
             <Text style={styles.h}>Qué se ve de tu perfil</Text>
             <Mute>
               Si prendés “Busco equipo” en Editar perfil, los capitanes ven tu nombre, username, foto, puestos, zona,
-              formatos y si jugás gratis o con tarifa. Nunca ven tu email, teléfono ni fecha de nacimiento.
+              formatos y si jugás gratis o con tarifa. Nunca ven tu email, teléfono, fecha de nacimiento ni DNI.
             </Mute>
             <Mute>
               “Busco equipo” y “Cómo jugás” son independientes: podés buscar plantel jugando gratis o cobrando.
