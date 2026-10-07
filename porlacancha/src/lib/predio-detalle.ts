@@ -72,7 +72,8 @@ function bool(v: unknown) {
   return v === true || v === "true";
 }
 
-function fotosFrom(raw: unknown, logo: string | null): string[] {
+/** Solo fotos reales de portada. El logo va aparte (degradé + logo si no hay fotos). */
+function fotosFrom(raw: unknown): string[] {
   const out: string[] = [];
   if (Array.isArray(raw)) {
     for (const x of raw) {
@@ -80,7 +81,6 @@ function fotosFrom(raw: unknown, logo: string | null): string[] {
       if (u) out.push(u);
     }
   }
-  if (out.length === 0 && logo) out.push(logo);
   return out;
 }
 
@@ -113,7 +113,7 @@ function mapDetalle(res: Record<string, unknown>): PredioDetalle {
     lat: num(res.lat),
     lng: num(res.lng),
     logo_url: logo,
-    fotos: fotosFrom(res.fotos, logo),
+    fotos: fotosFrom(res.fotos),
     whatsapp: res.whatsapp == null || str(res.whatsapp) === "" ? null : str(res.whatsapp),
     estacionamiento: bool(res.estacionamiento),
     buffet: bool(res.buffet),

@@ -697,6 +697,10 @@ export function MainTabs({ onRequestAuth }: Props) {
             }}
             onRequestAuth={onRequestAuth}
             onOpenDesafio={openDesafio}
+            onArmarPlus={(turnoId) => {
+              setReservePrefill((prev) => (prev ? { ...prev, turnoId } : prev));
+              setCrearPartidoOpen(true);
+            }}
             onDone={() => {
               setReservePrefill(null);
               setExploreView("hub");

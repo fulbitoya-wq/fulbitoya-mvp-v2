@@ -67,6 +67,10 @@ import { InicioOpenMatchCard } from "../inicio/InicioOpenMatchCard";
 import { ReservaPagoBlock } from "../reserva/ReservaPagoBlock";
 
 type TipoCobro = "sena" | "total";
+type ModoReserva = "simple" | "plus";
+
+/** Tarifa Plus mínima (display). El cobro real lo calcula el servidor en Fase 3. */
+const PLUS_TARIFA_DESDE = 1500;
 
 type Props = {
   canchaId: string;
@@ -78,6 +82,8 @@ type Props = {
   onRequestAuth: () => void;
   onDone: () => void;
   onOpenDesafio?: (d: Desafio) => void;
+  /** Fase 3: entrada temporal a armar partido (Plus) sin borrar el flujo viejo. */
+  onArmarPlus?: (turnoId: string) => void;
 };
 
 function onlyAvailable(op: OpcionesCobroReserva): TipoCobro | null {
@@ -102,11 +108,13 @@ export function PredioDetalleScreen({
   onRequestAuth,
   onDone,
   onOpenDesafio,
+  onArmarPlus,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { session } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
+  const queHacerY = useRef(0);
   const pagoY = useRef(0);
   const tipoRef = useRef<TipoCobro | null>(initialTipoCobro);
 
@@ -121,6 +129,7 @@ export function PredioDetalleScreen({
   const [fecha, setFecha] = useState<string>(dias[0] ?? "");
   const [campoId, setCampoId] = useState<string | "todos">("todos");
   const [turnoId, setTurnoId] = useState<string | null>(initialTurnoId);
+  const [modo, setModo] = useState<ModoReserva | null>(initialTurnoId ? "simple" : null);
   const [tipo, setTipo] = useState<TipoCobro | null>(initialTipoCobro);
   const [opciones, setOpciones] = useState<OpcionesCobroReserva | null>(null);
   const [opcionesLoading, setOpcionesLoading] = useState(false);
@@ -193,10 +202,15 @@ export function PredioDetalleScreen({
       setTipo(null);
       setAcepto(false);
       setQr(null);
+      setModo(null);
+      return;
+    }
+    if (modo !== "simple") {
+      setOpciones(null);
       return;
     }
     void loadOpciones(turnoId, tipoRef.current ?? initialTipoCobro);
-  }, [turnoId, loadOpciones, initialTipoCobro]);
+  }, [turnoId, modo, loadOpciones, initialTipoCobro]);
 
   const distancia = useMemo(() => {
     if (!userLoc || predio?.lat == null || predio?.lng == null) return null;
@@ -232,22 +246,43 @@ export function PredioDetalleScreen({
   const ctaLabel = (() => {
     if (busy) return "Continuando...";
     if (!turnoId) return "Elegí un horario";
-    if (!tipo || !acepto) return "Elegí cómo pagar";
+    if (!modo) return "Elegí una opción";
     return "Continuar →";
   })();
+
+  const scrollToQueHacer = () => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(queHacerY.current - 24, 0), animated: true });
+    });
+  };
 
   const selectTurno = (t: PredioTurno) => {
     if (t.estado !== "disponible") return;
     setTurnoId(t.id);
+    setModo(null);
     setQr(null);
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ y: Math.max(pagoY.current - 24, 0), animated: true });
-    });
+    scrollToQueHacer();
   };
 
   const continuar = async () => {
     if (!turnoId) {
       showNotice("Horario", "Elegí un horario libre para continuar.");
+      return;
+    }
+    if (!modo) {
+      showNotice("Reserva", "Elegí si querés reserva simple o Plus.");
+      scrollToQueHacer();
+      return;
+    }
+    if (modo === "plus") {
+      if (onArmarPlus) {
+        onArmarPlus(turnoId);
+        return;
+      }
+      showNotice(
+        "Reserva Plus",
+        "La configuración completa del partido Plus llega en la próxima fase. Por ahora usá Armar partido desde el botón +."
+      );
       return;
     }
     if (!tipo || !acepto) {
@@ -523,13 +558,13 @@ export function PredioDetalleScreen({
           </ScrollView>
 
           {/* 7. Horarios */}
-          <Text style={styles.section}>Horarios disponibles</Text>
+          <Text style={styles.section}>Horarios</Text>
           {libresDia.length === 0 ? (
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyT}>No hay horarios libres este día.</Text>
-              <Mute>Probá otro día</Mute>
+              <Text style={styles.emptyT}>Probá otro día</Text>
+              <Mute>No hay horarios libres este día. Te dejo los próximos con lugar.</Mute>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chips, { marginTop: 8 }]}>
-                {dias.filter((f) => diasConLibres.has(f)).slice(0, 6).map((f) => (
+                {dias.filter((f) => diasConLibres.has(f)).slice(0, 8).map((f) => (
                   <FilterChip
                     key={f}
                     accent="gold"
@@ -538,6 +573,7 @@ export function PredioDetalleScreen({
                     onPress={() => {
                       setFecha(f);
                       setTurnoId(null);
+                      setModo(null);
                     }}
                   />
                 ))}
@@ -556,52 +592,113 @@ export function PredioDetalleScreen({
                     style={[styles.hourChip, sel && styles.hourOn, !libre && styles.hourBusy]}
                     accessibilityRole="button"
                     accessibilityState={{ disabled: !libre, selected: sel }}
-                    accessibilityLabel={`${formatHora(t.hora_inicio)}${t.precio != null ? ` ${pesosReserva(t.precio)}` : ""}`}
+                    accessibilityLabel={`${formatHora(t.hora_inicio)}${t.precio != null ? ` ${pesosReserva(t.precio)}` : ""}${libre ? "" : " ocupado"}`}
                   >
-                    <Text style={styles.hourH}>{formatHora(t.hora_inicio)}</Text>
-                    {t.precio != null ? <Text style={styles.hourP}>{pesosReserva(t.precio)}</Text> : null}
+                    <Text style={[styles.hourH, !libre && styles.hourBusyT]}>{formatHora(t.hora_inicio)}</Text>
+                    {t.precio != null ? (
+                      <Text style={[styles.hourP, !libre && styles.hourBusyT]}>{pesosReserva(t.precio)}</Text>
+                    ) : null}
                   </Pressable>
                 );
               })}
             </View>
           )}
 
-          {/* 8. Bloque reserva */}
+          {/* 8. ¿Qué querés hacer? (entrada a Fase 3) */}
           <View
             onLayout={(e) => {
-              pagoY.current = e.nativeEvent.layout.y;
+              // y relativo al body + portada + padding del body
+              queHacerY.current = coverH + space[16] + e.nativeEvent.layout.y;
             }}
+            style={{ marginTop: space[8] }}
           >
-            {turnoId && opcionesLoading ? <Mute>Calculando formas de pago…</Mute> : null}
-            {turnoId && opciones && !opcionesLoading ? (
-              <ReservaPagoBlock
-                opciones={opciones}
-                tipo={tipo}
-                acepto={acepto}
-                onSelectTipo={(t) => {
-                  setTipo(t);
-                  setQr(null);
-                }}
-                onToggleAcepto={() => setAcepto((v) => !v)}
-              />
-            ) : null}
-            {qr && session?.access_token ? (
-              <View style={{ marginTop: space[16] }}>
-                <PagoQrCard
-                  initPoint={qr.initPoint}
-                  holdId={qr.holdId}
-                  accessToken={session.access_token}
-                  onConfirmada={() => {
-                    showNotice("Reserva", "El pago se confirmó. El turno quedó reservado.");
-                    onDone();
-                  }}
-                  onVencida={() => {
+            <Text style={styles.section}>¿Qué querés hacer?</Text>
+            {!turnoId ? (
+              <Mute>Primero elegí un horario libre.</Mute>
+            ) : (
+              <View style={styles.modoRow}>
+                <Pressable
+                  onPress={() => {
+                    setModo("simple");
                     setQr(null);
-                    showNotice("Pago", "Se venció el tiempo para pagar. El turno volvió a quedar libre.");
                   }}
-                />
+                  style={[styles.modoCard, modo === "simple" && styles.modoCardOn]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: modo === "simple" }}
+                >
+                  {modo === "simple" ? <Text style={styles.modoCheck}>✓</Text> : null}
+                  <Text style={styles.modoTitle}>Reserva simple</Text>
+                  <Text style={styles.modoSub}>Ya tenemos los jugadores</Text>
+                  <Text style={styles.modoMeta}>Gratis para el jugador</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setModo("plus");
+                    setTipo(null);
+                    setAcepto(false);
+                    setOpciones(null);
+                    setQr(null);
+                  }}
+                  style={[styles.modoCard, modo === "plus" && styles.modoCardOn]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: modo === "plus" }}
+                >
+                  {modo === "plus" ? <Text style={styles.modoCheck}>✓</Text> : null}
+                  <Text style={styles.modoTitle}>Reserva Plus</Text>
+                  <Text style={styles.modoSub}>Armá tu partido en la app</Text>
+                  <Text style={styles.modoMeta}>Desde {pesosReserva(PLUS_TARIFA_DESDE)}</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {modo === "plus" && turnoId ? (
+              <View style={[styles.emptyBox, { marginTop: space[12] }]}>
+                <Text style={styles.emptyT}>Configurás el partido en el próximo paso</Text>
+                <Mute>
+                  Modo, categoría, equipo, lugares libres y cómo pagan los que se suman. Tocá Continuar para seguir
+                  (por ahora abrimos el armado de partido con este turno).
+                </Mute>
               </View>
             ) : null}
+
+            <View
+              onLayout={(e) => {
+                pagoY.current = queHacerY.current + e.nativeEvent.layout.y;
+              }}
+            >
+              {modo === "simple" && turnoId && opcionesLoading ? (
+                <Mute>Calculando formas de pago…</Mute>
+              ) : null}
+              {modo === "simple" && turnoId && opciones && !opcionesLoading ? (
+                <ReservaPagoBlock
+                  opciones={opciones}
+                  tipo={tipo}
+                  acepto={acepto}
+                  onSelectTipo={(t) => {
+                    setTipo(t);
+                    setQr(null);
+                  }}
+                  onToggleAcepto={() => setAcepto((v) => !v)}
+                />
+              ) : null}
+              {qr && session?.access_token ? (
+                <View style={{ marginTop: space[16] }}>
+                  <PagoQrCard
+                    initPoint={qr.initPoint}
+                    holdId={qr.holdId}
+                    accessToken={session.access_token}
+                    onConfirmada={() => {
+                      showNotice("Reserva", "El pago se confirmó. El turno quedó reservado.");
+                      onDone();
+                    }}
+                    onVencida={() => {
+                      setQr(null);
+                      showNotice("Pago", "Se venció el tiempo para pagar. El turno volvió a quedar libre.");
+                    }}
+                  />
+                </View>
+              ) : null}
+            </View>
           </View>
 
           {/* 9. Partidos abiertos */}
@@ -792,10 +889,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  hourOn: { borderColor: colors.gold, backgroundColor: colors.surfaceHover },
-  hourBusy: { opacity: 0.35 },
+  hourOn: { borderColor: colors.gold, borderWidth: 2, backgroundColor: colors.surfaceHover },
+  hourBusy: { opacity: 0.38, borderColor: "rgba(184,196,214,0.25)" },
   hourH: typeStyle("body", colors.white),
   hourP: typeStyle("caption", colors.textSecondary),
+  hourBusyT: { color: colors.textSecondary },
+  modoRow: { flexDirection: "row", gap: 10, marginTop: 8 },
+  modoCard: {
+    flex: 1,
+    minHeight: 132,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: "rgba(139,201,235,0.35)",
+    backgroundColor: colors.navyDark,
+    padding: space[12],
+    gap: 4,
+  },
+  modoCardOn: {
+    borderColor: colors.gold,
+    borderWidth: 2,
+    backgroundColor: colors.surfaceHover,
+  },
+  modoCheck: { ...typeStyle("caption", colors.gold), alignSelf: "flex-end" },
+  modoTitle: typeStyle("h3", colors.white),
+  modoSub: typeStyle("bodySmall", colors.sky),
+  modoMeta: typeStyle("caption", colors.textSecondary),
   emptyBox: {
     borderWidth: 1,
     borderColor: colors.border,
