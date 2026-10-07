@@ -37,8 +37,10 @@ function AuthCallbackInner() {
       }
 
       await completeOrigenRegistro(user.id, "fulbitoya");
-      const path = await redirectPathForUser(user.id);
-      router.replace(path);
+      await redirectPathForUser(user.id);
+      const next = searchParams.get("next");
+      const dest = next && next.startsWith("/dashboard") ? next : "/dashboard";
+      router.replace(dest);
       router.refresh();
     };
 

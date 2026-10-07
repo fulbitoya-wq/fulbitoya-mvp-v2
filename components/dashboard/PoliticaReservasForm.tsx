@@ -251,14 +251,14 @@ export const PoliticaReservasForm = forwardRef<PoliticaReservasFormHandle, Props
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-[#1A2E4A]">Desafíos</h3>
+        <h3 className="text-sm font-semibold text-[#1A2E4A]">Partidos abiertos</h3>
         <label className="flex items-center gap-2 text-sm text-[#1A2E4A]">
           <input
             type="checkbox"
             checked={form.desafios_habilitados}
             onChange={(e) => patch({ desafios_habilitados: e.target.checked })}
           />
-          Habilitar desafíos en este predio
+          Habilitar partidos abiertos en este predio
         </label>
         <p className="text-xs text-[#1A2E4A]/60">Horarios habilitados (días y franjas)</p>
         <div className="space-y-2">

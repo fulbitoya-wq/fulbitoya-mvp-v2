@@ -2,140 +2,131 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getCanchasDelOwner, type Cancha } from "@/lib/canchas";
+import { getCanchaDelOwnerById, type Cancha } from "@/lib/canchas";
 import { getCamposByCancha, type Campo } from "@/lib/campos";
+import { AddressPreviewMap } from "@/components/maps/AddressPreviewMap";
+
+function etiquetaSuperficie(valor: string | null): string {
+  if (valor === "cesped_sintetico") return "sintético";
+  if (valor === "cesped_natural") return "natural";
+  if (valor === "salon") return "salón";
+  return valor ?? "—";
+}
 
 export default function CanchaCamposPage() {
   const params = useParams();
-  const router = useRouter();
   const canchaId = params.id as string;
-
   const [cancha, setCancha] = useState<Cancha | null>(null);
-  const [cargando, setCargando] = useState(true);
-  const [canchasError, setCanchasError] = useState<string | null>(null);
   const [campos, setCampos] = useState<Campo[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     const load = async () => {
-      setCargando(true);
-      setCanchasError(null);
-
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
-        setCanchasError("Debés estar logueado.");
+        setError("Debés estar logueado.");
         setCargando(false);
         return;
       }
-
-      // Validamos que pertenezca al owner (por seguridad y porque usamos RLS).
-      const ownerCanchas = await getCanchasDelOwner(user.id);
-      const found = ownerCanchas.find((c) => c.id === canchaId) ?? null;
-
+      const found = await getCanchaDelOwnerById(canchaId);
       if (!found) {
-        setCanchasError("No encontré el complejo o no tenés permisos.");
-        setCancha(null);
-        setCampos([]);
+        setError("No encontré el predio o no es tuyo.");
         setCargando(false);
         return;
       }
-
       setCancha(found);
-      const camposRows = await getCamposByCancha(canchaId);
-      setCampos(camposRows);
+      setCampos(await getCamposByCancha(canchaId));
       setCargando(false);
     };
-
-    load();
+    void load();
   }, [canchaId]);
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
-      <div className="flex items-center justify-between gap-3">
-        <Link
-          href="/dashboard/canchas"
-          className="text-sm font-medium text-[#1A2E4A]/70 hover:underline"
-        >
-          ← Volver a mis canchas
+    <div className="mx-auto max-w-5xl p-4 sm:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link href="/dashboard/canchas" className="text-sm font-medium text-[#1A2E4A]/70 hover:underline">
+          ← Predios
         </Link>
-        {cancha && (
-          <button
-            type="button"
-            onClick={() => router.push(`/dashboard/canchas/${cancha.id}/campos/crear`)}
-            className="rounded-lg border border-[#E0E0E0] px-3 py-2 text-sm font-medium text-[#1A2E4A] hover:bg-[#F5F5F5]"
-          >
-            Nuevo campo
-          </button>
-        )}
+        {cancha ? (
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/dashboard/canchas/${cancha.id}/excepciones`}
+              className="rounded-lg border border-[#E0E0E0] px-3 py-2 text-sm font-medium text-[#1A2E4A]"
+            >
+              Feriados y cierres
+            </Link>
+            <Link
+              href={`/dashboard/canchas/${cancha.id}/campos/crear`}
+              className="rounded-lg bg-[var(--fulbito-green)] px-3 py-2 text-sm font-medium text-white"
+            >
+              Nueva cancha
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <h1 className="mt-4 font-subheading text-2xl font-semibold text-[#1A2E4A]">
-        {cargando ? "Cargando..." : cancha?.nombre ?? "Complejo"}
+        {cargando ? "Cargando…" : `Canchas · ${cancha?.nombre ?? ""}`}
       </h1>
+      <p className="mt-1 text-sm text-[#1A2E4A]/70">
+        {cancha?.direccion ?? "Cada cancha arma sola los turnos según apertura, duración y precios."}
+      </p>
+      {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
 
-      {canchasError && (
-        <p className="mt-3 text-sm text-red-700">{canchasError}</p>
-      )}
+      {cancha?.lat != null && cancha?.lng != null ? (
+        <div className="mt-4">
+          <AddressPreviewMap lat={cancha.lat} lng={cancha.lng} />
+        </div>
+      ) : null}
 
       {cargando ? (
-        <p className="mt-4 text-[#1A2E4A]/70">Obteniendo campos...</p>
-      ) : (
-        <div className="mt-6 space-y-3">
-          <p className="text-[#1A2E4A]/70">
-            Campos: {campos.length}
-          </p>
-
-          {campos.length === 0 ? (
-            <div className="rounded-xl border border-[#E0E0E0] bg-white p-6 text-center">
-              <p className="text-[#1A2E4A]/70">Todavía no cargaste campos en este complejo.</p>
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {campos.map((campo) => (
-                <li key={campo.id} className="rounded-xl border border-[#E0E0E0] bg-white p-4">
-                  <div className="flex min-w-0 flex-col gap-1">
-                    {campo.foto_url && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={campo.foto_url}
-                        alt={`Foto del campo ${campo.nombre}`}
-                        className="h-16 w-16 shrink-0 rounded-lg border border-[#E0E0E0] object-cover"
-                      />
-                    )}
-                    <p className="truncate font-semibold text-[#1A2E4A]">{campo.nombre}</p>
-                    <p className="text-sm text-[#1A2E4A]/70">
-                      Tipo: {campo.tipo ?? "—"} - Superficie: {campo.superficie ?? "—"}
-                    </p>
-                    <p className="text-sm text-[#1A2E4A]/70">
-                      Precio/hora: ${Number(campo.valor_hora ?? 0).toLocaleString("es-AR")} · Reserva: ${Number(campo.valor_reserva ?? 0).toLocaleString("es-AR")}
-                    </p>
-                    {(campo.luz || campo.camaras || campo.minutero || campo.marcador_gol) && (
-                      <p className="mt-1 text-xs text-[#1A2E4A]/60">
-                        {[
-                          campo.luz ? "Luz" : null,
-                          campo.camaras ? "Cámaras" : null,
-                          campo.minutero ? "Minutero" : null,
-                          campo.marcador_gol ? "Marcador" : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
-                    )}
-                    <Link
-                      href={`/dashboard/canchas/${cancha.id}/campos/${campo.id}/editar`}
-                      className="mt-2 inline-block text-sm font-medium text-[var(--fulbito-green)] hover:underline"
-                    >
-                      Editar precio, seña y política
-                    </Link>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+        <p className="mt-4 text-[#1A2E4A]/70">Obteniendo canchas…</p>
+      ) : campos.length === 0 ? (
+        <div className="mt-6 rounded-xl border border-[#E0E0E0] bg-white p-6 text-center">
+          <p className="text-[#1A2E4A]/70">Todavía no cargaste canchas en este predio.</p>
         </div>
+      ) : (
+        <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+          {campos.map((campo) => {
+            const foto = campo.foto_url || campo.fotos?.[0];
+            return (
+              <li key={campo.id} className="overflow-hidden rounded-xl border border-[#E0E0E0] bg-white shadow-sm">
+                {foto ? (
+                  <img src={foto} alt="" className="h-36 w-full object-cover" />
+                ) : (
+                  <div className="flex h-36 items-center justify-center bg-[#1A2E4A]/5 text-sm text-[#1A2E4A]/50">
+                    Sin foto
+                  </div>
+                )}
+                <div className="p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate font-semibold text-[#1A2E4A]">{campo.nombre}</p>
+                    <span className="rounded-full bg-[#1A2E4A] px-2 py-0.5 text-xs font-medium text-white">
+                      F{campo.tipo ?? "—"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-[#1A2E4A]/70">
+                    {etiquetaSuperficie(campo.superficie)} · {campo.duracion_min ?? 60} min
+                    {campo.techada ? " · techada" : ""}
+                    {campo.luz ? " · luz" : ""}
+                  </p>
+                  <Link
+                    href={`/dashboard/canchas/${canchaId}/campos/${campo.id}/editar`}
+                    className="mt-3 inline-block text-sm font-medium text-[var(--fulbito-green)]"
+                  >
+                    Editar precios y turnos
+                  </Link>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );
 }
-

@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { loadGoogleMaps } from "@/lib/google-maps";
+import { useEffect, useRef, useState } from "react";
+import {
+  loadGooglePlacesLib,
+  type PlaceNew,
+  type PlacePrediction,
+} from "@/lib/google-maps";
 
 export interface PlaceSelection {
   formattedAddress: string;
@@ -21,15 +25,40 @@ interface PlacesAutocompleteInputProps {
   className?: string;
 }
 
-function barrioFromComponents(
-  components: Array<{ long_name: string; types: string[] }> | undefined
-): string | null {
+type AddressPiece = { longText?: string; long_name?: string; types: string[] };
+
+function barrioFromComponents(components: AddressPiece[] | undefined): string | null {
   if (!components) return null;
   const subtype =
     components.find((c) => c.types.includes("neighborhood")) ||
     components.find((c) => c.types.includes("sublocality_level_1")) ||
     components.find((c) => c.types.includes("locality"));
-  return subtype?.long_name ?? null;
+  return subtype?.longText ?? subtype?.long_name ?? null;
+}
+
+function predictionLabel(pred: PlacePrediction): string {
+  const text = pred.text;
+  if (!text) return "";
+  return typeof text === "string" ? text : text.toString();
+}
+
+function coordsFromPlace(place: PlaceNew): { lat: number; lng: number } | null {
+  const loc = place.location;
+  if (!loc) return null;
+  if (typeof loc.toJSON === "function") {
+    const j = loc.toJSON();
+    if (typeof j?.lat === "number" && typeof j?.lng === "number") return j;
+  }
+  const lat = typeof loc.lat === "function" ? loc.lat() : loc.lat;
+  const lng = typeof loc.lng === "function" ? loc.lng() : loc.lng;
+  if (typeof lat === "number" && typeof lng === "number") return { lat, lng };
+  return null;
+}
+
+function displayNameText(place: PlaceNew): string {
+  const n = place.displayName;
+  if (!n) return "";
+  return typeof n === "string" ? n : n.text ?? "";
 }
 
 export function PlacesAutocompleteInput({
@@ -41,75 +70,127 @@ export function PlacesAutocompleteInput({
   required,
   className,
 }: PlacesAutocompleteInputProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const acRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [hints, setHints] = useState<PlacePrediction[]>([]);
+  const [open, setOpen] = useState(false);
+  const [mapsError, setMapsError] = useState<string | null>(null);
+  const tokenRef = useRef<unknown>(null);
+  const reqIdRef = useRef(0);
+  const skipFetchRef = useRef(false);
   const onPlaceSelectedRef = useRef(onPlaceSelected);
+  const onChangeRef = useRef(onChange);
   onPlaceSelectedRef.current = onPlaceSelected;
-  const mapsErrorRef = useRef<HTMLParagraphElement>(null);
+  onChangeRef.current = onChange;
 
   useEffect(() => {
-    let cancelled = false;
-
-    const setup = async () => {
-      try {
-        await loadGoogleMaps();
-      } catch (err) {
-        if (!cancelled && mapsErrorRef.current) {
-          mapsErrorRef.current.textContent =
-            err instanceof Error ? err.message : "No se pudo cargar Google Maps.";
+    if (skipFetchRef.current) {
+      skipFetchRef.current = false;
+      return;
+    }
+    const q = value.trim();
+    if (q.length < 3) {
+      setHints([]);
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        const requestId = ++reqIdRef.current;
+        try {
+          const places = await loadGooglePlacesLib();
+          if (!tokenRef.current && places.AutocompleteSessionToken) {
+            tokenRef.current = new places.AutocompleteSessionToken();
+          }
+          const { suggestions } = await places.AutocompleteSuggestion!.fetchAutocompleteSuggestions({
+            input: q,
+            includedRegionCodes: ["AR"],
+            language: "es-AR",
+            region: "AR",
+            sessionToken: tokenRef.current ?? undefined,
+          });
+          if (requestId !== reqIdRef.current) return;
+          setMapsError(null);
+          setHints(suggestions.map((s) => s.placePrediction).filter((p): p is PlacePrediction => Boolean(p)));
+          setOpen(true);
+        } catch (err) {
+          if (requestId !== reqIdRef.current) return;
+          setHints([]);
+          setMapsError(err instanceof Error ? err.message : "No se pudo cargar Google Maps.");
         }
-        return;
-      }
-      if (cancelled || !inputRef.current || acRef.current) return;
+      })();
+    }, 220);
+    return () => window.clearTimeout(handle);
+  }, [value]);
 
-      const ac = new google.maps.places.Autocomplete(inputRef.current, {
-        componentRestrictions: { country: "ar" },
-        fields: ["formatted_address", "geometry", "place_id", "address_components", "name"],
+  const pick = async (pred: PlacePrediction) => {
+    setOpen(false);
+    setHints([]);
+    try {
+      const place = pred.toPlace();
+      await place.fetchFields({
+        fields: ["formattedAddress", "location", "id", "addressComponents", "displayName"],
       });
-      acRef.current = ac;
-
-      ac.addListener("place_changed", () => {
-        const place = ac.getPlace();
-        const loc = place.geometry?.location;
-        if (!loc) return;
+      const coords = coordsFromPlace(place);
+      const address = place.formattedAddress || predictionLabel(pred) || displayNameText(place) || value;
+      skipFetchRef.current = true;
+      onChangeRef.current(address);
+      if (coords) {
         onPlaceSelectedRef.current({
-          formattedAddress: place.formatted_address || inputRef.current?.value || "",
-          lat: loc.lat(),
-          lng: loc.lng(),
-          placeId: place.place_id ?? null,
-          barrio: barrioFromComponents(place.address_components),
+          formattedAddress: address,
+          lat: coords.lat,
+          lng: coords.lng,
+          placeId: place.id ?? null,
+          barrio: barrioFromComponents(place.addressComponents),
         });
-      });
-    };
-
-    setup();
-
-    return () => {
-      cancelled = true;
-      if (acRef.current) {
-        google.maps.event.clearInstanceListeners(acRef.current);
-        acRef.current = null;
       }
-    };
-  }, []);
+      tokenRef.current = null;
+    } catch (err) {
+      setMapsError(err instanceof Error ? err.message : "No se pudo completar la dirección.");
+    }
+  };
 
   return (
-    <div>
+    <div className="relative">
       <input
-        ref={inputRef}
         id={id}
         type="text"
-        value={value}
-        required={required}
         autoComplete="off"
+        required={required}
+        value={value}
         placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          if (hints.length) setOpen(true);
+        }}
+        onBlur={() => {
+          window.setTimeout(() => setOpen(false), 180);
+        }}
         className={
           className ??
-          "mt-1 w-full rounded-lg border border-[#E0E0E0] px-4 py-2 focus:border-[var(--fulbito-green)] focus:outline-none focus:ring-1 focus:ring-[var(--fulbito-green)]"
+          "mt-1 w-full rounded-lg border border-[#E0E0E0] bg-white px-3 py-2 text-[#1A2E4A] focus:border-[#4CAF50] focus:outline-none focus:ring-1 focus:ring-[#4CAF50]"
         }
       />
-      <p ref={mapsErrorRef} className="mt-1 text-xs text-red-700" />
+      {open && hints.length > 0 ? (
+        <ul className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-[#E0E0E0] bg-white py-1 shadow-lg">
+          {hints.map((pred, i) => {
+            const label = predictionLabel(pred);
+            return (
+              <li key={`${label}-${i}`}>
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm text-[#1A2E4A] hover:bg-[#F5F5F5]"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void pick(pred)}
+                >
+                  {label}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      {mapsError ? <p className="mt-1 text-xs text-red-700">{mapsError}</p> : null}
     </div>
   );
 }

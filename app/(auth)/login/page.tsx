@@ -8,6 +8,12 @@ import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { enterFulbitoYa } from "@/lib/auth/profile";
 import { supabase } from "@/lib/supabase";
 
+function nextDelPanel(): string | null {
+  if (typeof window === "undefined") return null;
+  const n = new URLSearchParams(window.location.search).get("next");
+  return n && n.startsWith("/dashboard") ? n : null;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -27,9 +33,9 @@ export default function LoginPage() {
         if (typeof window !== "undefined") {
           localStorage.removeItem("authRedirectAfterLogin");
         }
-        const path = await enterFulbitoYa();
+        await enterFulbitoYa();
         if (!mounted) return;
-        router.replace(path);
+        router.replace(nextDelPanel() ?? "/dashboard");
         router.refresh();
         return;
       }
@@ -68,8 +74,8 @@ export default function LoginPage() {
       if (typeof window !== "undefined") {
         localStorage.removeItem("authRedirectAfterLogin");
       }
-      const path = await enterFulbitoYa();
-      router.replace(path);
+      await enterFulbitoYa();
+      router.replace(nextDelPanel() ?? "/dashboard");
       router.refresh();
       return;
     }

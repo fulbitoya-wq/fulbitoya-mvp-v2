@@ -1,8 +1,18 @@
 import { supabase } from "@/lib/supabase";
 
+export type PredioEstado = "borrador" | "en_revision" | "aprobado" | "suspendido";
+
+export interface HorarioDia {
+  abierto: boolean;
+  desde: string;
+  hasta: string;
+}
+
+export type HorariosApertura = Record<string, HorarioDia>;
+
 export interface Cancha {
   id: string;
-  owner_id: string;
+  owner_id: string | null;
   nombre: string;
   direccion: string | null;
   barrio: string | null;
@@ -11,9 +21,19 @@ export interface Cancha {
   fondo_url: string | null;
   logo_url: string | null;
   activa: boolean;
+  estado: PredioEstado;
   estacionamiento: boolean | null;
   buffet: boolean | null;
   vestuarios: boolean | null;
+  parrilla: boolean | null;
+  whatsapp: string | null;
+  responsable_nombre: string | null;
+  responsable_email: string | null;
+  responsable_telefono: string | null;
+  responsable_doc: string | null;
+  horarios_apertura: HorariosApertura | null;
+  fotos: string[] | null;
+  revision_nota: string | null;
   provincia_id: string | null;
   partido_id: string | null;
   localidad_id: string | null;
@@ -22,6 +42,7 @@ export interface Cancha {
   place_id: string | null;
   valor_hora: number | null;
   valor_reserva: number | null;
+  ventana_dias: number | null;
   created_at: string;
 }
 
@@ -36,6 +57,14 @@ export interface CrearCanchaInput {
   estacionamiento?: boolean | null;
   buffet?: boolean | null;
   vestuarios?: boolean | null;
+  parrilla?: boolean | null;
+  whatsapp?: string | null;
+  responsable_nombre?: string | null;
+  responsable_email?: string | null;
+  responsable_telefono?: string | null;
+  responsable_doc?: string | null;
+  horarios_apertura?: HorariosApertura | null;
+  fotos?: string[] | null;
   provincia_id?: string | null;
   partido_id?: string | null;
   localidad_id?: string | null;
@@ -44,6 +73,7 @@ export interface CrearCanchaInput {
   place_id?: string | null;
   valor_hora?: number | null;
   valor_reserva?: number | null;
+  ventana_dias?: number | null;
 }
 
 export async function crearCancha(input: CrearCanchaInput): Promise<{ data: { id: string } | null; error: string | null }> {
@@ -65,6 +95,15 @@ export async function crearCancha(input: CrearCanchaInput): Promise<{ data: { id
       estacionamiento: input.estacionamiento ?? false,
       buffet: input.buffet ?? false,
       vestuarios: input.vestuarios ?? false,
+      parrilla: input.parrilla ?? false,
+      whatsapp: input.whatsapp ?? null,
+      responsable_nombre: input.responsable_nombre ?? null,
+      responsable_email: input.responsable_email ?? null,
+      responsable_telefono: input.responsable_telefono ?? null,
+      responsable_doc: input.responsable_doc ?? null,
+      horarios_apertura: input.horarios_apertura ?? null,
+      fotos: input.fotos ?? [],
+      estado: "borrador",
       provincia_id: input.provincia_id ?? null,
       partido_id: input.partido_id ?? null,
       localidad_id: input.localidad_id ?? null,
@@ -73,7 +112,7 @@ export async function crearCancha(input: CrearCanchaInput): Promise<{ data: { id
       place_id: input.place_id ?? null,
       valor_hora: input.valor_hora ?? 0,
       valor_reserva: input.valor_reserva ?? 0,
-      activa: true,
+      ventana_dias: input.ventana_dias ?? 60,
     })
     .select("id")
     .single();
@@ -88,9 +127,18 @@ export async function getCanchasDelOwner(ownerId: string): Promise<Cancha[]> {
     .select("*")
     .eq("owner_id", ownerId)
     .order("created_at", { ascending: false });
+  const owned = error ? [] : ((data ?? []) as Cancha[]);
 
-  if (error) return [];
-  return (data ?? []) as Cancha[];
+  const { data: staff } = await supabase
+    .from("predio_encargados")
+    .select("cancha_id")
+    .eq("usuario_id", ownerId)
+    .eq("estado", "activo");
+  const ids = (staff ?? []).map((r) => r.cancha_id as string).filter((id) => !owned.some((c) => c.id === id));
+  if (!ids.length) return owned;
+
+  const { data: extra } = await supabase.from("canchas").select("*").in("id", ids);
+  return [...owned, ...((extra ?? []) as Cancha[])];
 }
 
 export interface ActualizarCanchaInput {
@@ -100,11 +148,24 @@ export interface ActualizarCanchaInput {
   descripcion?: string | null;
   logo_url?: string | null;
   fondo_url?: string | null;
+  foto_url?: string | null;
   lat?: number | null;
   lng?: number | null;
   place_id?: string | null;
   valor_hora?: number | null;
   valor_reserva?: number | null;
+  estacionamiento?: boolean | null;
+  buffet?: boolean | null;
+  vestuarios?: boolean | null;
+  parrilla?: boolean | null;
+  whatsapp?: string | null;
+  responsable_nombre?: string | null;
+  responsable_email?: string | null;
+  responsable_telefono?: string | null;
+  responsable_doc?: string | null;
+  horarios_apertura?: HorariosApertura | null;
+  fotos?: string[] | null;
+  ventana_dias?: number | null;
 }
 
 export async function getCanchaDelOwnerById(canchaId: string): Promise<Cancha | null> {
@@ -147,6 +208,19 @@ export async function actualizarCanchaDelOwner(
   if (input.place_id !== undefined) payload.place_id = input.place_id;
   if (input.valor_hora !== undefined) payload.valor_hora = input.valor_hora;
   if (input.valor_reserva !== undefined) payload.valor_reserva = input.valor_reserva;
+  if (input.estacionamiento !== undefined) payload.estacionamiento = input.estacionamiento;
+  if (input.buffet !== undefined) payload.buffet = input.buffet;
+  if (input.vestuarios !== undefined) payload.vestuarios = input.vestuarios;
+  if (input.parrilla !== undefined) payload.parrilla = input.parrilla;
+  if (input.whatsapp !== undefined) payload.whatsapp = input.whatsapp;
+  if (input.responsable_nombre !== undefined) payload.responsable_nombre = input.responsable_nombre;
+  if (input.responsable_email !== undefined) payload.responsable_email = input.responsable_email;
+  if (input.responsable_telefono !== undefined) payload.responsable_telefono = input.responsable_telefono;
+  if (input.responsable_doc !== undefined) payload.responsable_doc = input.responsable_doc;
+  if (input.horarios_apertura !== undefined) payload.horarios_apertura = input.horarios_apertura;
+  if (input.fotos !== undefined) payload.fotos = input.fotos;
+  if (input.foto_url !== undefined) payload.foto_url = input.foto_url;
+  if (input.ventana_dias !== undefined) payload.ventana_dias = input.ventana_dias;
 
   const { error } = await supabase
     .from("canchas")
@@ -223,7 +297,8 @@ export async function buscarCanchasConDisponibilidad(
   let canchasQuery = supabase
     .from("canchas")
     .select("id, nombre, direccion, barrio, logo_url, estacionamiento, buffet, vestuarios, activa, provincia_id, partido_id, localidad_id")
-    .eq("activa", true);
+    .eq("activa", true)
+    .eq("estado", "aprobado");
 
   // Resolución por ubicación:
   // - Si vienen ids (localidad/partido/provincia), filtramos exacto por esos ids.
