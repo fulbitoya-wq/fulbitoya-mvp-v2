@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { colors, radius, space } from "@shared/design";
+import {
+  autocompletePlacesWeb,
+  detailsFromPredictionWeb,
+  placesWebAvailable,
+  type PlacesHint,
+} from "../lib/places-web";
 import { webBaseUrl } from "../lib/web-url";
 import { Mute } from "./index";
 import { typeStyle } from "./textStyle";
@@ -15,7 +21,13 @@ export type PlacePick = {
   telefono: string | null;
 };
 
-type Hint = { placeId: string; label: string; mainText: string; secondaryText: string };
+type Hint = {
+  placeId: string;
+  label: string;
+  mainText: string;
+  secondaryText: string;
+  prediction?: PlacesHint["prediction"];
+};
 
 type Props = {
   onConfirmed: (place: PlacePick) => void;
@@ -29,6 +41,50 @@ function apiBase(): string {
   return "";
 }
 
+async function autocompleteServer(q: string): Promise<Hint[]> {
+  const base = apiBase();
+  if (!base) throw new Error("Falta la URL web para buscar lugares.");
+  const res = await fetch(`${base}/api/places/autocomplete?q=${encodeURIComponent(q)}`);
+  const body = (await res.json()) as { ok?: boolean; suggestions?: Hint[]; error?: string };
+  if (!body.ok) throw new Error(body.error ?? "No se pudo buscar.");
+  return (body.suggestions ?? []).map((s) => ({
+    placeId: s.placeId,
+    label: s.label,
+    mainText: s.mainText,
+    secondaryText: s.secondaryText,
+  }));
+}
+
+async function detailsServer(placeId: string): Promise<PlacePick> {
+  const base = apiBase();
+  const res = await fetch(`${base}/api/places/details?placeId=${encodeURIComponent(placeId)}`);
+  const body = (await res.json()) as {
+    ok?: boolean;
+    place?: {
+      placeId: string;
+      nombre: string;
+      direccion: string;
+      lat: number | null;
+      lng: number | null;
+      barrio: string | null;
+      telefono: string | null;
+    };
+    error?: string;
+  };
+  if (!body.ok || !body.place || body.place.lat == null || body.place.lng == null) {
+    throw new Error(body.error ?? "No se pudo confirmar el lugar.");
+  }
+  return {
+    placeId: body.place.placeId,
+    nombre: body.place.nombre,
+    direccion: String(body.place.direccion || ""),
+    lat: body.place.lat,
+    lng: body.place.lng,
+    barrio: body.place.barrio,
+    telefono: body.place.telefono,
+  };
+}
+
 export function PlacesSearch({ onConfirmed, placeholder = "Buscá una cancha o predio..." }: Props) {
   const [q, setQ] = useState("");
   const [hints, setHints] = useState<Hint[]>([]);
@@ -36,6 +92,7 @@ export function PlacesSearch({ onConfirmed, placeholder = "Buscá una cancha o p
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const req = useRef(0);
+  const useClient = Platform.OS === "web" && placesWebAvailable();
 
   useEffect(() => {
     const query = q.trim();
@@ -43,76 +100,65 @@ export function PlacesSearch({ onConfirmed, placeholder = "Buscá una cancha o p
       setHints([]);
       return;
     }
-    const base = apiBase();
-    if (!base) {
-      setErr("Falta la URL web para buscar lugares.");
-      return;
-    }
     const handle = setTimeout(() => {
       const id = ++req.current;
       void (async () => {
         try {
-          const res = await fetch(`${base}/api/places/autocomplete?q=${encodeURIComponent(query)}`);
-          const body = (await res.json()) as { ok?: boolean; suggestions?: Hint[]; error?: string };
-          if (id !== req.current) return;
-          if (!body.ok) {
-            setErr(body.error ?? "No se pudo buscar.");
-            setHints([]);
-            return;
+          let list: Hint[];
+          if (useClient) {
+            const webHints = await autocompletePlacesWeb(query);
+            list = webHints.map((h) => ({
+              placeId: h.placeId,
+              label: h.label,
+              mainText: h.mainText,
+              secondaryText: h.secondaryText,
+              prediction: h.prediction,
+            }));
+          } else {
+            list = await autocompleteServer(query);
           }
-          setErr(null);
-          setHints(
-            (body.suggestions ?? []).map((s) => ({
-              placeId: s.placeId,
-              label: s.label,
-              mainText: s.mainText,
-              secondaryText: s.secondaryText,
-            }))
-          );
-        } catch {
           if (id !== req.current) return;
-          setErr("No se pudo buscar lugares.");
+          setErr(null);
+          setHints(list);
+        } catch (e) {
+          if (id !== req.current) return;
           setHints([]);
+          setErr(e instanceof Error ? e.message : "No se pudo buscar lugares.");
         }
       })();
     }, 220);
     return () => clearTimeout(handle);
-  }, [q, pending]);
+  }, [q, pending, useClient]);
 
   const pickHint = async (h: Hint) => {
     setBusy(true);
     setErr(null);
     try {
-      const base = apiBase();
-      const res = await fetch(`${base}/api/places/details?placeId=${encodeURIComponent(h.placeId)}`);
-      const body = (await res.json()) as {
-        ok?: boolean;
-        place?: {
-          placeId: string;
-          nombre: string;
-          direccion: string;
-          lat: number | null;
-          lng: number | null;
-          barrio: string | null;
-          telefono: string | null;
+      let place: PlacePick;
+      if (useClient && h.prediction) {
+        const d = await detailsFromPredictionWeb(h.prediction);
+        place = {
+          placeId: d.placeId || h.placeId,
+          nombre: d.nombre || h.mainText,
+          direccion: d.direccion,
+          lat: d.lat,
+          lng: d.lng,
+          barrio: d.barrio,
+          telefono: d.telefono,
         };
-        error?: string;
-      };
-      if (!body.ok || !body.place || body.place.lat == null || body.place.lng == null) {
-        setErr(body.error ?? "No se pudo confirmar el lugar.");
+      } else {
+        place = await detailsServer(h.placeId);
+        if (!place.nombre) place.nombre = h.mainText;
+      }
+      if (!place.placeId) {
+        setErr("Google no devolvió el place_id de ese lugar.");
         return;
       }
-      setPending({
-        placeId: body.place.placeId,
-        nombre: body.place.nombre || h.mainText,
-        direccion: String(body.place.direccion || ""),
-        lat: body.place.lat,
-        lng: body.place.lng,
-        barrio: body.place.barrio,
-        telefono: body.place.telefono,
-      });
+      setPending(place);
       setHints([]);
-      setQ(body.place.nombre || h.mainText);
+      setQ(place.nombre);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudo confirmar el lugar.");
     } finally {
       setBusy(false);
     }
@@ -136,10 +182,7 @@ export function PlacesSearch({ onConfirmed, placeholder = "Buscá una cancha o p
           >
             <Text style={styles.chipT}>No, buscar otro</Text>
           </Pressable>
-          <Pressable
-            onPress={() => onConfirmed(pending)}
-            style={styles.btn}
-          >
+          <Pressable onPress={() => onConfirmed(pending)} style={styles.btn}>
             <Text style={styles.chipT}>Sí, es este</Text>
           </Pressable>
         </View>
@@ -159,8 +202,11 @@ export function PlacesSearch({ onConfirmed, placeholder = "Buscá una cancha o p
       />
       {err ? <Text style={styles.err}>{err}</Text> : null}
       {busy ? <Mute>Cargando…</Mute> : null}
-      {hints.map((h) => (
-        <Pressable key={h.placeId} onPress={() => void pickHint(h)} style={styles.hint}>
+      {!err && q.trim().length >= 3 && hints.length === 0 && !busy ? (
+        <Mute>Escribí el nombre del predio (mín. 3 letras). Si no aparece, probá con el barrio.</Mute>
+      ) : null}
+      {hints.map((h, i) => (
+        <Pressable key={`${h.placeId}-${i}`} onPress={() => void pickHint(h)} style={styles.hint}>
           <Text style={styles.body}>{h.mainText || h.label}</Text>
           {h.secondaryText ? <Mute>{h.secondaryText}</Mute> : null}
         </Pressable>
