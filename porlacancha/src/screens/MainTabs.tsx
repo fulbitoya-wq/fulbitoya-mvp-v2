@@ -357,7 +357,7 @@ export function MainTabs({ onRequestAuth }: Props) {
         return;
       }
       if (action.kind === "crear_partido") {
-        setReservaPlus({ kind: "plus" });
+        setCrearPartidoOpen(true);
         return;
       }
       if (action.kind === "reserva_plus") {
@@ -806,7 +806,7 @@ export function MainTabs({ onRequestAuth }: Props) {
               setExploreView("reservar");
             }}
             onArmar={() => {
-              void queueOrRun({ kind: "reserva_plus" }, () => setReservaPlus({ kind: "plus" }));
+              void queueOrRun({ kind: "crear_partido" }, () => setCrearPartidoOpen(true));
             }}
             onOpenDesafio={openDesafio}
             onOpenReserva={(r) => setReservaDetalle(r)}
@@ -890,7 +890,7 @@ export function MainTabs({ onRequestAuth }: Props) {
         }}
         onArmarPartido={() => {
           setPlusOpen(false);
-          void queueOrRun({ kind: "reserva_plus" }, () => setReservaPlus({ kind: "plus" }));
+          void queueOrRun({ kind: "crear_partido" }, () => setCrearPartidoOpen(true));
         }}
         onCompletarPartido={
           completarReservaId
