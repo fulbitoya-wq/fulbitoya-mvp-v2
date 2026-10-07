@@ -63,7 +63,7 @@ export const EQUIPOS_RPC_ERRORS: Record<string, string> = {
   anticipacion_minima_baja: "La anticipación mínima no puede ser de menos de 3 horas.",
   politica_invalida: "Revisá los datos de la política.",
   premios_deshabilitados: "Los premios siguen deshabilitados.",
-  no_dueno_predio: "Solo el dueño del predio puede cambiar esta política.",
+  no_dueno_predio: "Solo el dueño del predio puede hacer eso.",
   no_periodo_gratis: "Ya no se puede cancelar gratis: pasaron las 24 horas o el partido se publicó con menos de 48 horas.",
   decision_invalida: "Esa opción no está disponible ahora.",
   requiere_confirmar_riesgo: "Tenés que confirmar que, si nadie se suma, se cobra la cancha completa.",
