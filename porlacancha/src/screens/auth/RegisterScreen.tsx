@@ -4,7 +4,7 @@ import { firstZodError, registerSchema } from "@shared/validation/auth";
 import { colors } from "@shared/design";
 import { supabase } from "../../lib/supabase";
 import { emailRedirectConfirm } from "../../lib/web-url";
-import { AuthScreen, BrandLogo, Button, Field, Heading, Lead } from "../../ui";
+import { AuthScreen, BirthdateField, BrandLogo, Button, Field, Heading, Lead } from "../../ui";
 import { typeStyle } from "../../ui/textStyle";
 import { AuthBackBar } from "./AuthBackBar";
 import { AuthNoticeModal } from "./AuthNoticeModal";
@@ -15,7 +15,7 @@ type Props = { onGoLogin: () => void; onSkip?: () => void };
 function mapSignupError(message: string): string {
   const m = message.toLowerCase();
   if (m.includes("menor_13")) return "Tenés que tener al menos 13 años para crear una cuenta.";
-  if (m.includes("fecha_nacimiento")) return "Revisá la fecha de nacimiento (AAAA-MM-DD).";
+  if (m.includes("fecha_nacimiento")) return "Revisá la fecha de nacimiento.";
   return message;
 }
 
@@ -82,14 +82,7 @@ export function RegisterScreen({ onGoLogin, onSkip }: Props) {
         invalid={Boolean(error)}
         onChangeText={onChangeClear(setEmail)}
       />
-      <Field
-        placeholder="Fecha de nacimiento (AAAA-MM-DD)"
-        value={fechaNacimiento}
-        keyboardType="numbers-and-punctuation"
-        autoCapitalize="none"
-        invalid={Boolean(error)}
-        onChangeText={onChangeClear(setFechaNacimiento)}
-      />
+      <BirthdateField value={fechaNacimiento} onChange={onChangeClear(setFechaNacimiento)} />
       <Field
         leftIcon="lock"
         secureTextEntry

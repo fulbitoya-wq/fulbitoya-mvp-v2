@@ -168,8 +168,11 @@ export function chipToneEstado(estado: string): "open" | "complete" | "cancelled
 export function formatFechaCorta(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map(Number);
   const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
-  const txt = dt.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" });
-  return txt.replaceAll(".", "");
+  if (Number.isNaN(dt.getTime())) return isoDate;
+  const weekday = dt.toLocaleDateString("es-AR", { weekday: "long" });
+  const day = String(dt.getDate()).padStart(2, "0");
+  const month = String(dt.getMonth() + 1).padStart(2, "0");
+  return `${weekday} ${day}/${month}`;
 }
 
 export function formatHora(hora: string): string {

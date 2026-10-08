@@ -24,7 +24,18 @@ import {
 } from "../lib/plc";
 import { supabase } from "../lib/supabase";
 import { ChevronLeft, iconStroke } from "../lib/icons";
-import { Button, EmptyState, IconBtn, Mute, PlacesSearch, showNotice, type PlacePick } from "../ui";
+import {
+  Button,
+  DateField,
+  EmptyState,
+  IconBtn,
+  Mute,
+  PlacesSearch,
+  TimeField,
+  showNotice,
+  type PlacePick,
+} from "../ui";
+import { partidoDateBounds } from "../lib/fecha-ui";
 import { typeStyle } from "../ui/textStyle";
 import { CompleteIdentidadDesafioScreen } from "./auth/CompleteIdentidadDesafioScreen";
 
@@ -489,7 +500,7 @@ export function CrearPartidoScreen({
           <>
             {loadErr ? <Mute>{loadErr}</Mute> : null}
             {turnosFmt.length === 0 ? (
-              <Mute>No hay turnos libres para {etiquetaTipo(formato)}. Probá agregar una cancha.</Mute>
+              <Mute>{`No hay turnos libres para ${etiquetaTipo(formato)}. Probá agregar una cancha.`}</Mute>
             ) : (
               turnosFmt.slice(0, 40).map((t) => (
                 <Pressable
@@ -505,8 +516,9 @@ export function CrearPartidoScreen({
                     {t.barrio ? ` · ${t.barrio}` : ""}
                   </Text>
                   <Mute>
-                    {t.campo_nombre} · {formatFechaCorta(t.fecha)} · {formatHora(t.hora_inicio)}
-                    {t.precio != null ? ` · ${pesos(t.precio)}` : ""}
+                    {`${t.campo_nombre} · ${formatFechaCorta(t.fecha)} · ${formatHora(t.hora_inicio)}${
+                      t.precio != null ? ` · ${pesos(t.precio)}` : ""
+                    }`}
                   </Mute>
                 </Pressable>
               ))
@@ -533,20 +545,14 @@ export function CrearPartidoScreen({
             {placeCanchaId ? (
               <>
                 <Text style={[styles.h, { marginTop: space[16] }]}>Día y hora</Text>
-                <TextInput
+                <DateField
                   value={fecha}
-                  onChangeText={setFecha}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.textSecondary}
-                  style={styles.input}
+                  onChange={setFecha}
+                  minimumDate={partidoDateBounds().min}
+                  maximumDate={partidoDateBounds().max}
+                  placeholder="Elegí el día"
                 />
-                <TextInput
-                  value={hora}
-                  onChangeText={setHora}
-                  placeholder="HH:MM"
-                  placeholderTextColor={colors.textSecondary}
-                  style={[styles.input, { marginTop: space[8] }]}
-                />
+                <TimeField value={hora} onChange={setHora} placeholder="Elegí la hora" />
                 <Text style={[styles.h, { marginTop: space[16] }]}>Formato</Text>
                 <View style={styles.rowWrap}>
                   {(["f5", "f7", "f9", "f11"] as const).map((f) => (
@@ -635,8 +641,9 @@ export function CrearPartidoScreen({
           <View style={{ marginTop: space[12], gap: space[4] }}>
             <Text style={styles.h}>Desglose</Text>
             <Mute>
-              Cancha {pesos(cotDep.precio_cancha)} · Tarifa {pesos(cotDep.tarifa)} · Total por equipo{" "}
-              {pesos(cotDep.total_equipo)}
+              {`Cancha ${pesos(cotDep.precio_cancha)} · Tarifa ${pesos(cotDep.tarifa)} · Total por equipo ${pesos(
+                cotDep.total_equipo
+              )}`}
             </Mute>
             <Pressable onPress={() => setAceptaTarifa((v) => !v)} style={styles.row}>
               <View style={[styles.box, aceptaTarifa && styles.boxOn]} />
@@ -652,7 +659,7 @@ export function CrearPartidoScreen({
           <View style={{ marginTop: space[12], gap: space[4] }}>
             <Text style={styles.h}>Condiciones</Text>
             <Mute>{typeof cond.mensaje_tramo === "string" ? cond.mensaje_tramo : ""}</Mute>
-            <Mute>Cancha {pesos(cond.precio_cancha)} · tu equipo {pesos(cond.monto_equipo_a)}</Mute>
+            <Mute>{`Cancha ${pesos(cond.precio_cancha)} · tu equipo ${pesos(cond.monto_equipo_a)}`}</Mute>
           </View>
         ) : null}
 
@@ -673,9 +680,7 @@ export function CrearPartidoScreen({
           <>
             <Text style={[styles.h, { marginTop: space[16] }]}>Tu lado</Text>
             <Mute>
-              Para publicar alcanza con el capitán. Sumá jugadores con cuenta, invitados por nombre o dejá
-              lugares libres ({min} cupos). En por la cancha, si un lado está incompleto a la hora del partido,
-              cuenta como walkover.
+              {`Para publicar alcanza con el capitán. Sumá jugadores con cuenta, invitados por nombre o dejá lugares libres (${min} cupos). En por la cancha, si un lado está incompleto a la hora del partido, cuenta como walkover.`}
             </Mute>
             {conCuenta.length > 0 ? (
               <>

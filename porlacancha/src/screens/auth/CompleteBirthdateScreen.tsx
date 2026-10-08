@@ -5,7 +5,7 @@ import { mensajeErrorEquipo, rpcGuardarFechaNacimiento } from "@shared/equipos";
 import { colors } from "@shared/design";
 import { useAuth } from "../../auth/AuthProvider";
 import { supabase } from "../../lib/supabase";
-import { BrandLogo, Button, ErrorText, Field, Heading, Lead, Screen } from "../../ui";
+import { BirthdateField, BrandLogo, Button, ErrorText, Heading, Lead, Screen } from "../../ui";
 import { typeStyle } from "../../ui/textStyle";
 import { AuthBackBar } from "./AuthBackBar";
 
@@ -42,13 +42,9 @@ export function CompleteBirthdateScreen({ onDone }: Props) {
       <Heading>Tu fecha de nacimiento</Heading>
       <Lead>La necesitamos para reservar y jugar. Tenés que tener al menos 13 años. No la mostramos en tu perfil público.</Lead>
       {error ? <ErrorText>{error}</ErrorText> : null}
-      <Field
-        placeholder="AAAA-MM-DD"
+      <BirthdateField
         value={fecha}
-        keyboardType="numbers-and-punctuation"
-        autoCapitalize="none"
-        invalid={Boolean(error)}
-        onChangeText={(v) => {
+        onChange={(v) => {
           setFecha(v);
           if (error) setError(null);
         }}

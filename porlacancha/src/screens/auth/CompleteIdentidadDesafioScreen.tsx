@@ -3,7 +3,7 @@ import { firstZodError, identidadDesafioSchema } from "@shared/validation/auth";
 import { mensajeErrorEquipo, rpcGuardarIdentidadDesafio, rpcMiEstadoEdad } from "@shared/equipos";
 import { useAuth } from "../../auth/AuthProvider";
 import { supabase } from "../../lib/supabase";
-import { BrandLogo, Button, ErrorText, Field, Heading, Lead, Screen } from "../../ui";
+import { BirthdateField, BrandLogo, Button, ErrorText, Field, Heading, Lead, Screen } from "../../ui";
 import { AuthBackBar } from "./AuthBackBar";
 
 type Props = {
@@ -61,13 +61,9 @@ export function CompleteIdentidadDesafioScreen({ onDone, onCancel }: Props) {
         El DNI no aparece en tu perfil ni en búsquedas, y después no se puede cambiar desde la app.
       </Lead>
       {error ? <ErrorText>{error}</ErrorText> : null}
-      <Field
-        placeholder="Fecha de nacimiento (AAAA-MM-DD)"
+      <BirthdateField
         value={fecha}
-        keyboardType="numbers-and-punctuation"
-        autoCapitalize="none"
-        invalid={Boolean(error)}
-        onChangeText={(v) => {
+        onChange={(v) => {
           setFecha(v);
           if (error) setError(null);
         }}
