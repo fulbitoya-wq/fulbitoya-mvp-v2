@@ -472,7 +472,7 @@ export function CrearPartidoScreen({
         </View>
         <Mute>
           {modalidad === "por_la_cancha"
-            ? "Cada lado deposita el valor de la cancha más la tarifa. Al ganador se le devuelve el depósito."
+            ? "Cada lado paga la cancha de anticipado más la tarifa. Si ganan, el depósito de la cancha se le reembolsa al capitán."
             : origen === "places" && !placeAdherido
               ? "Gratis en la app. Los que se suman pagan en el lugar. Etiqueta: Cancha no adherida."
               : "Partido abierto. En predio adherido puede haber tarifa Plus según el turno."}

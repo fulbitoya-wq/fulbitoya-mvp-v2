@@ -105,7 +105,9 @@ export function DesafioDetalleScreen({
   const ctaLabel = guest
     ? "Ingresá para inscribir"
     : estadoInscripcion === "pendiente_pago"
-      ? "Pagar seña de prueba"
+      ? porLaCancha
+        ? "Pagar cancha de anticipado"
+        : "Pagar seña de prueba"
       : inscriptoComo === "capitan"
         ? "Editar convocados"
         : inscriptoComo === "miembro"
@@ -138,7 +140,12 @@ export function DesafioDetalleScreen({
       showNotice("No se pudo confirmar el pago", res.error);
       return;
     }
-    showNotice("Pago de prueba", "La inscripción quedó confirmada. No se cobró con Mercado Pago.");
+    showNotice(
+      porLaCancha ? "Cancha pagada de anticipado" : "Pago de prueba",
+      porLaCancha
+        ? "Quedó confirmado el depósito de la cancha (modo prueba, sin Mercado Pago). Si tu equipo gana, ese dinero se le reembolsa al capitán."
+        : "La inscripción quedó confirmada. No se cobró con Mercado Pago."
+    );
     onPaid?.();
     void load();
   };
@@ -333,9 +340,15 @@ export function DesafioDetalleScreen({
           <Mute>
             {amistoso
               ? "Amistoso: el equipo que publica paga la cancha. Si se completa el rival, se devuelve la mitad. Podés sumarte suelto."
-              : "Por la cancha: cada equipo paga lo que calcula el predio. Si no hay rival, se aplica la seña según el plazo."}
+              : porLaCancha
+                ? "Por la cancha: cada equipo paga la cancha de anticipado (más la tarifa). Si ganan, el depósito de la cancha se le reembolsa al capitán."
+                : "Cada equipo paga lo que calcula el predio según la modalidad."}
           </Mute>
-          <Mute>En este entorno el pago es de prueba: no pasa por Mercado Pago real.</Mute>
+          <Mute>
+            {porLaCancha && estadoInscripcion === "pendiente_pago"
+              ? "Ahora estás en modo prueba: al confirmar no se abre Mercado Pago, pero el depósito queda registrado igual."
+              : "En este entorno el pago es de prueba: no pasa por Mercado Pago real."}
+          </Mute>
           {copyVisible ? <Text style={styles.body}>{copyVisible}</Text> : null}
 
           {amistoso && !guest && !inscriptoComo ? (
@@ -349,7 +362,13 @@ export function DesafioDetalleScreen({
       <View style={[styles.sticky, { paddingBottom: insets.bottom + space[12] }]}>
         <View>
           <Text style={styles.ctaKicker}>
-            {estadoInscripcion === "pendiente_pago" ? "A pagar" : solo ? "Modalidad" : "Premio"}
+            {estadoInscripcion === "pendiente_pago"
+              ? porLaCancha
+                ? "Cancha de anticipado"
+                : "A pagar"
+              : solo
+                ? "Modalidad"
+                : "Premio"}
           </Text>
           <Text style={styles.ctaPrize}>{stickyLabel}</Text>
         </View>
