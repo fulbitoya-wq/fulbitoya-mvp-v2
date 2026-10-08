@@ -51,13 +51,17 @@ export function InscribirEquipoScreen({ desafio, captainTeams, existing, onBack,
   }, [equipoId, existing]);
 
   const selected = useMemo(() => [...picked], [picked]);
-  const canSave = selected.length >= min && !busy;
+  // Alcanza con el capitán; el plantel se completa después (y después paga).
+  const canSave = !!equipoId && selected.length >= 1 && !busy;
 
   const toggle = (id: string) => {
     setPicked((prev) => {
       const n = new Set(prev);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
+      if (n.has(id)) {
+        const cap = miembros.find((m) => m.rol === "capitan" && m.usuario_id);
+        if (cap?.usuario_id === id) return prev;
+        n.delete(id);
+      } else n.add(id);
       return n;
     });
   };
@@ -79,10 +83,12 @@ export function InscribirEquipoScreen({ desafio, captainTeams, existing, onBack,
     showNotice(
       existing ? "Convocados actualizados" : "Equipo inscripto",
       existing
-        ? "Quedó la nueva lista."
+        ? "Quedó la nueva lista. Podés seguir sumando jugadores."
         : res.ok && "estado" in res && res.estado === "pendiente_pago"
-          ? "Reservamos el lugar 15 minutos. Confirmá el pago de prueba en el partido."
-          : "La inscripción quedó confirmada."
+          ? porLaCancha
+            ? "Reservamos el lugar 15 minutos. Pagá la cancha de anticipado; después podés completar el plantel."
+            : "Reservamos el lugar 15 minutos. Confirmá el pago de prueba en el partido."
+          : "La inscripción quedó confirmada. Podés completar el plantel después."
     );
     onDone();
   };
@@ -151,10 +157,11 @@ export function InscribirEquipoScreen({ desafio, captainTeams, existing, onBack,
       </View>
       <ScrollView contentContainerStyle={{ padding: space[16], paddingBottom: insets.bottom + space[40] }}>
         <Mute>
-          {etiquetaTipo(desafio.tipo)} · mínimo {min} convocados
-          {porLaCancha || premio
-            ? " · por la cancha / premio: mayores de 18; el capitán que paga también carga DNI"
-            : " · desde 13 años, con fecha de nacimiento en el perfil"}
+          {`${etiquetaTipo(desafio.tipo)} · para anotar alcanza con el capitán (${min} cupos al horario del partido)${
+            porLaCancha || premio
+              ? " · por la cancha / premio: mayores de 18; el capitán que paga también carga DNI"
+              : " · desde 13 años, con fecha de nacimiento en el perfil"
+          }`}
         </Mute>
 
         {captainTeams.length > 1 && !existing ? (
@@ -176,14 +183,14 @@ export function InscribirEquipoScreen({ desafio, captainTeams, existing, onBack,
           </Text>
         )}
 
-        {miembros.length < min ? (
+        {miembros.filter((m) => m.usuario_id && !m.es_invitado).length < min ? (
           <Mute>
-            Este plantel tiene {miembros.length}. Para {etiquetaTipo(desafio.tipo)} hacen falta {min}.
+            {`Tenés ${miembros.filter((m) => m.usuario_id && !m.es_invitado).length} con cuenta de ${min} cupos. Podés inscribirte igual y completar el plantel después; el pago lo hace el capitán.`}
           </Mute>
         ) : null}
 
         <Text style={[styles.h, { marginTop: space[16] }]}>
-          Quiénes juegan ({selected.length}/{min})
+          {`Quiénes juegan (${selected.length}/${min})`}
         </Text>
         {miembros
           .filter((m) => m.usuario_id && !m.es_invitado)
@@ -213,7 +220,7 @@ export function InscribirEquipoScreen({ desafio, captainTeams, existing, onBack,
           <Button
             label={busy ? "Guardando..." : existing ? "Guardar convocados" : "Confirmar inscripción"}
             onPress={() => void confirmar()}
-            disabled={!canSave || miembros.length < min}
+            disabled={!canSave}
             loading={busy}
           />
         </View>
