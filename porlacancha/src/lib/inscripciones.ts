@@ -60,7 +60,7 @@ export function textoErrorInscripcion(res: { error: string; quienes?: string; mi
 
 export async function inscribirEquipo(desafioId: string, equipoId: string, convocados: string[]) {
   const res = await rpcInscribirEquipo(supabase, desafioId, equipoId, convocados);
-  if (!res.ok) return { ok: false as const, error: textoErrorInscripcion(res) };
+  if (!res.ok) return { ok: false as const, error: textoErrorInscripcion(res), code: res.error };
   return { ok: true as const, inscripcionId: res.inscripcion_id, estado: res.estado };
 }
 

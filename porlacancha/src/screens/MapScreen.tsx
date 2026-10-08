@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 import { colors, radius, space } from "@shared/design";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { formatPremioCorto, type Desafio } from "../lib/desafios";
 import { X, iconStroke } from "../lib/icons";
 import { DesafioCard, TAB_BAR_CONTENT_INSET } from "../ui";
+import { CanchaMap } from "../ui/maps/CanchaMap";
 
 const BA = {
   latitude: -34.6037,
@@ -39,48 +39,29 @@ export function MapScreen({
 
   return (
     <View style={styles.root}>
-      <MapView
+      <CanchaMap
         style={StyleSheet.absoluteFill}
-        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
-        initialRegion={BA}
-        zoomEnabled
-        scrollEnabled
-        rotateEnabled
-        pitchEnabled
-        zoomTapEnabled
-      >
-        {items.map((d) => {
-          const active = d.id === selectedId;
+        region={BA}
+        onSelectPin={onSelect}
+        pins={items.flatMap((d) => {
           const lat = Number(d.lat);
           const lng = Number(d.lng);
-          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+          const active = d.id === selectedId;
           const premio = formatPremioCorto(Number(d.premio));
-          if (Platform.OS === "ios") {
-            return (
-              <Marker
-                key={d.id}
-                coordinate={{ latitude: lat, longitude: lng }}
-                title={premio}
-                description={d.titulo}
-                pinColor={active ? "#D9A928" : "#8BC9EB"}
-                onPress={() => onSelect(d.id)}
-              />
-            );
-          }
-          return (
-            <Marker
-              key={d.id}
-              coordinate={{ latitude: lat, longitude: lng }}
-              onPress={() => onSelect(d.id)}
-              tracksViewChanges={false}
-            >
-              <View style={[styles.pin, active && styles.pinActive]}>
-                <Text style={[styles.pinText, active && styles.pinTextActive]}>{premio}</Text>
-              </View>
-            </Marker>
-          );
+          return [
+            {
+              id: d.id,
+              latitude: lat,
+              longitude: lng,
+              title: premio,
+              description: d.titulo,
+              label: Platform.OS === "ios" ? undefined : premio,
+              active,
+            },
+          ];
         })}
-      </MapView>
+      />
 
       <View style={styles.sheet}>
         {loading ? (
@@ -133,13 +114,4 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   error: { fontSize: 13, color: colors.danger },
-  pin: {
-    backgroundColor: colors.sky,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  pinActive: { backgroundColor: colors.gold },
-  pinText: { fontSize: 12, fontWeight: "800", color: colors.navyDark },
-  pinTextActive: { color: colors.navyDark },
 });

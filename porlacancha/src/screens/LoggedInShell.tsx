@@ -7,9 +7,11 @@ import { rememberJoinTokenFromUrl } from "../lib/join-token";
 import {
   clearPendingAction,
   peekPendingAction,
+  profileNeedsBirthdate,
   profileNeedsPhone,
   profileNeedsUsername,
 } from "../lib/pending-action";
+import { CompleteBirthdateScreen } from "./auth/CompleteBirthdateScreen";
 import { CompletePhoneScreen } from "./auth/CompletePhoneScreen";
 import { CompleteUsernameScreen } from "./auth/CompleteUsernameScreen";
 import { MainTabs } from "./MainTabs";
@@ -21,7 +23,7 @@ type Props = {
 
 export function LoggedInShell({ onRequestAuth }: Props) {
   const { session, profile } = useAuth();
-  const [gate, setGate] = useState<null | "username" | "phone">(null);
+  const [gate, setGate] = useState<null | "username" | "phone" | "birthdate">(null);
   const [claimToken, setClaimToken] = useState<string | null>(null);
   const triedJoin = useRef<string | null>(null);
   const askedAuthForClaim = useRef(false);
@@ -64,13 +66,20 @@ export function LoggedInShell({ onRequestAuth }: Props) {
         action.kind === "join_token" ||
         action.kind === "create_team" ||
         action.kind === "accept_invite" ||
-        action.kind === "inscribir";
+        action.kind === "inscribir" ||
+        action.kind === "reservar" ||
+        action.kind === "crear_partido" ||
+        action.kind === "lista_reserva";
       if (mustComplete && profileNeedsUsername(profile)) {
         setGate("username");
         return;
       }
       if (mustComplete && profileNeedsPhone(profile)) {
         setGate("phone");
+        return;
+      }
+      if (mustComplete && profileNeedsBirthdate(profile)) {
+        setGate("birthdate");
         return;
       }
       setGate(null);
@@ -93,7 +102,7 @@ export function LoggedInShell({ onRequestAuth }: Props) {
       cancelled = true;
       sub.remove();
     };
-  }, [session, profile, profile?.username, profile?.telefono]);
+  }, [session, profile, profile?.username, profile?.telefono, profile?.fecha_nacimiento]);
 
   if (session && claimToken) {
     return (
@@ -116,6 +125,9 @@ export function LoggedInShell({ onRequestAuth }: Props) {
   }
   if (session && gate === "phone") {
     return <CompletePhoneScreen />;
+  }
+  if (session && gate === "birthdate") {
+    return <CompleteBirthdateScreen />;
   }
 
   return <MainTabs onRequestAuth={onRequestAuth} />;

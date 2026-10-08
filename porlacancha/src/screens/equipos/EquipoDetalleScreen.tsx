@@ -3,7 +3,6 @@ import {
   Image,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -17,12 +16,14 @@ import {
   rpcExpulsarJugador,
   rpcGenerarEnlaceEquipo,
   rpcInvitarJugador,
+  rpcInvitarSinCuenta,
   rpcResponderSolicitud,
   rpcSalirDelEquipo,
   rpcTransferirCapitania,
 } from "@shared/equipos";
 import { firstZodError } from "@shared/validation/auth";
 import { useAuth } from "../../auth/AuthProvider";
+import { compartirTexto } from "../../lib/share-text";
 import {
   getEquipoDetalle,
   listSolicitudesEntrada,
@@ -48,6 +49,7 @@ export function EquipoDetalleScreen({ equipoId, onBack, onLeft, onBuscarJugadore
   const [enlace, setEnlace] = useState<string | null>(null);
   const [solicitudes, setSolicitudes] = useState<SolicitudItem[]>([]);
   const [identificador, setIdentificador] = useState("");
+  const [invitadoNombre, setInvitadoNombre] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -87,7 +89,7 @@ export function EquipoDetalleScreen({ equipoId, onBack, onLeft, onBuscarJugadore
   const compartirEnlace = async () => {
     if (!enlace) return;
     const url = enlaceCompartirEquipo(enlace, process.env.EXPO_PUBLIC_WEB_URL);
-    await Share.share({ message: `Sumate a ${nombre} en PorLaCancha: ${url}` });
+    await compartirTexto(`Sumate a ${nombre} en PorLaCancha: ${url}`);
   };
 
   const invitar = async () => {
@@ -101,6 +103,27 @@ export function EquipoDetalleScreen({ equipoId, onBack, onLeft, onBuscarJugadore
     if (!res.ok) return fail(res.error);
     setIdentificador("");
     showNotice("Listo", "Invitación enviada.");
+  };
+
+  const invitarSinCuenta = async () => {
+    setError(null);
+    const nombreInv = invitadoNombre.trim();
+    if (!nombreInv) {
+      setError("Poné el nombre del invitado.");
+      return;
+    }
+    const res = await rpcInvitarSinCuenta(supabase, equipoId, nombreInv);
+    if (!res.ok) return fail(res.error);
+    setInvitadoNombre("");
+    const token = typeof res.claim_token === "string" ? res.claim_token : "";
+    if (token && enlace) {
+      const url = enlaceCompartirEquipo(enlace, process.env.EXPO_PUBLIC_WEB_URL);
+      await compartirTexto(
+        `Sumate a ${nombre} en PorLaCancha (soy ${nombreInv}): ${url}`
+      );
+    }
+    showNotice("Listo", `${nombreInv} quedó como invitado hasta que se registre.`);
+    await load();
   };
 
   const responder = async (id: string, aceptar: boolean) => {
@@ -211,6 +234,18 @@ export function EquipoDetalleScreen({ equipoId, onBack, onLeft, onBuscarJugadore
           />
           <Pressable style={styles.cta} onPress={invitar}>
             <Text style={styles.ctaTxt}>Enviar invitación</Text>
+          </Pressable>
+
+          <Text style={styles.h2}>Invitado sin cuenta</Text>
+          <Text style={styles.muted}>Queda como “Soy {invitadoNombre.trim() || "Nico"}” hasta que se registre.</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Nombre (ej: Nico)"
+            value={invitadoNombre}
+            onChangeText={setInvitadoNombre}
+          />
+          <Pressable style={styles.cta} onPress={() => void invitarSinCuenta()}>
+            <Text style={styles.ctaTxt}>Agregar e invitar por WhatsApp</Text>
           </Pressable>
 
           <Text style={styles.h2}>Enlace</Text>

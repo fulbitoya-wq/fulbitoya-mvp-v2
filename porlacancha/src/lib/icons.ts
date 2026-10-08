@@ -7,6 +7,9 @@ export { default as Ban } from "lucide-react-native/dist/cjs/icons/ban.js";
 export { default as Bell } from "lucide-react-native/dist/cjs/icons/bell.js";
 export { default as Building2 } from "lucide-react-native/dist/cjs/icons/building.js";
 export { default as Calendar } from "lucide-react-native/dist/cjs/icons/calendar.js";
+export { default as CalendarDays } from "lucide-react-native/dist/cjs/icons/calendar-days.js";
+export { default as Car } from "lucide-react-native/dist/cjs/icons/car.js";
+export { default as ChevronDown } from "lucide-react-native/dist/cjs/icons/chevron-down.js";
 export { default as Camera } from "lucide-react-native/dist/cjs/icons/camera.js";
 export { default as Check } from "lucide-react-native/dist/cjs/icons/check.js";
 export { default as ChevronLeft } from "lucide-react-native/dist/cjs/icons/chevron-left.js";
@@ -16,6 +19,12 @@ export { default as CirclePlus } from "lucide-react-native/dist/cjs/icons/circle
 export { default as Clock } from "lucide-react-native/dist/cjs/icons/clock.js";
 export { default as Compass } from "lucide-react-native/dist/cjs/icons/compass.js";
 export { default as CreditCard } from "lucide-react-native/dist/cjs/icons/credit-card.js";
+export { default as Lightbulb } from "lucide-react-native/dist/cjs/icons/lightbulb.js";
+export { default as MessageCircle } from "lucide-react-native/dist/cjs/icons/message-circle.js";
+export { default as Navigation } from "lucide-react-native/dist/cjs/icons/navigation.js";
+export { default as Shirt } from "lucide-react-native/dist/cjs/icons/shirt.js";
+export { default as Utensils } from "lucide-react-native/dist/cjs/icons/utensils.js";
+export { default as Warehouse } from "lucide-react-native/dist/cjs/icons/warehouse.js";
 export { default as Eye } from "lucide-react-native/dist/cjs/icons/eye.js";
 export { default as EyeOff } from "lucide-react-native/dist/cjs/icons/eye-off.js";
 export { default as Crown } from "lucide-react-native/dist/cjs/icons/crown.js";
@@ -42,4 +51,5 @@ export { default as Trophy } from "lucide-react-native/dist/cjs/icons/trophy.js"
 export { default as User } from "lucide-react-native/dist/cjs/icons/user.js";
 export { default as UserRound } from "lucide-react-native/dist/cjs/icons/user-round.js";
 export { default as Users } from "lucide-react-native/dist/cjs/icons/users.js";
+export { default as UsersRound } from "lucide-react-native/dist/cjs/icons/users-round.js";
 export { default as X } from "lucide-react-native/dist/cjs/icons/x.js";

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ImageBackground, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, PLAYER_RANKS, space } from "@shared/design";
 import { mensajeErrorEquipo, rpcInvitarJugador } from "@shared/equipos";
@@ -8,6 +8,7 @@ import type { SearchPlayer } from "../../lib/player-search";
 import { formatArs } from "../../lib/player-ranks";
 import { ChevronLeft, Heart, MoreHorizontal, Share2, Users, iconStroke } from "../../lib/icons";
 import { hapticLight } from "../../lib/haptics";
+import { compartirTexto } from "../../lib/share-text";
 import { listMisFavoritos, toggleFavorito } from "../../lib/favoritos";
 import {
   bloquearUsuario,
@@ -86,11 +87,10 @@ export function PlayerPublicProfileScreen({
   };
 
   const share = () => {
-    void Share.share({
-      message: player.username
-        ? `${player.name} (@${player.username}) en PorLaCancha`
-        : `${player.name} en PorLaCancha`,
-    });
+    const message = player.username
+      ? `${player.name} (@${player.username}) en PorLaCancha`
+      : `${player.name} en PorLaCancha`;
+    void compartirTexto(message);
   };
 
   const sendInvite = async (equipoId: string) => {

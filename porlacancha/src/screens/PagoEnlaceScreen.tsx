@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, Share, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { colors, space } from "@shared/design";
 import { useAuth } from "../auth/AuthProvider";
 import {
@@ -13,7 +13,9 @@ import {
   type EnlacePagoVista,
 } from "../lib/reserva";
 import { formatFechaCorta, formatHora } from "../lib/desafios";
+import { compartirTexto } from "../lib/share-text";
 import { BrandLogo, Button, ErrorText, Heading, Lead, Mute, Screen, showNotice } from "../ui";
+import { PagoQrCard } from "../ui/PagoQrCard";
 import { typeStyle } from "../ui/textStyle";
 import { AuthBackBar } from "./auth/AuthBackBar";
 import { ReservaListaScreen } from "./ReservaListaScreen";
@@ -36,6 +38,7 @@ export function PagoEnlaceScreen({ token, onDone, onCancel }: Props) {
   const [busy, setBusy] = useState(false);
   const [reservaId, setReservaId] = useState<string | null>(null);
   const [lista, setLista] = useState(false);
+  const [qr, setQr] = useState<{ initPoint: string; holdId: string } | null>(null);
 
   useEffect(() => {
     void verEnlacePago(token).then((r) => {
@@ -69,11 +72,16 @@ export function PagoEnlaceScreen({ token, onDone, onCancel }: Props) {
       showNotice("No se pudo pagar", res.error);
       return;
     }
-    if (res.reservaId) setReservaId(res.reservaId);
-    else {
-      showNotice("Mercado Pago", "Te llevamos a pagar. El turno se confirma cuando se aprueba el pago.");
-      onDone();
+    if ("reservaId" in res) {
+      setReservaId(res.reservaId);
+      return;
     }
+    if (res.canal === "qr") {
+      setQr({ initPoint: res.initPoint, holdId: res.holdId });
+      return;
+    }
+    showNotice("Mercado Pago", "Te llevamos a pagar. El turno se confirma cuando se aprueba el pago.");
+    onDone();
   };
 
   if (lista && reservaId) {
@@ -90,9 +98,9 @@ export function PagoEnlaceScreen({ token, onDone, onCancel }: Props) {
         <Button
           label="Compartir con amigos"
           onPress={() => {
-            void Share.share({
-              message: `Jugamos el ${vista?.fecha ?? ""} a las ${vista?.hora_inicio ?? ""} en ${vista?.cancha_nombre ?? ""}. Sumate en PorLaCancha.`,
-            });
+            void compartirTexto(
+              `Jugamos el ${vista?.fecha ?? ""} a las ${vista?.hora_inicio ?? ""} en ${vista?.cancha_nombre ?? ""}. Sumate en PorLaCancha.`,
+            );
           }}
         />
         <View style={{ height: space[8] }} />
@@ -161,12 +169,25 @@ export function PagoEnlaceScreen({ token, onDone, onCancel }: Props) {
               {acepto ? "✓" : "○"} Acepto las reglas del predio
             </Text>
           </Pressable>
-          <Button
-            label={busy ? "Procesando..." : `Pagar ${pesosReserva(cot.monto_pagar)}`}
-            onPress={() => void pagar()}
-            loading={busy}
-            disabled={!acepto || busy}
-          />
+          {qr && session?.access_token ? (
+            <PagoQrCard
+              initPoint={qr.initPoint}
+              holdId={qr.holdId}
+              accessToken={session.access_token}
+              onConfirmada={(id) => setReservaId(id)}
+              onVencida={() => {
+                setQr(null);
+                showNotice("Pago", "Se venció el tiempo para pagar. El turno volvió a quedar libre.");
+              }}
+            />
+          ) : (
+            <Button
+              label={busy ? "Procesando..." : `Pagar ${pesosReserva(cot.monto_pagar)}`}
+              onPress={() => void pagar()}
+              loading={busy}
+              disabled={!acepto || busy}
+            />
+          )}
         </>
       ) : null}
     </Screen>

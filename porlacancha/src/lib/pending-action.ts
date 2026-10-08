@@ -11,7 +11,24 @@ export type PendingAction =
   | { kind: "open_inbox" }
   | { kind: "accept_invite"; solicitudId: string }
   | { kind: "inscribir"; desafioId: string }
-  | { kind: "favorite"; jugadorId: string };
+  | { kind: "favorite"; jugadorId: string }
+  | {
+      kind: "reservar";
+      canchaId?: string;
+      turnoId?: string;
+      tipoCobro?: "sena" | "total";
+      acepto?: boolean;
+    }
+  | { kind: "crear_partido" }
+  | {
+      kind: "reserva_plus";
+      canchaId?: string;
+      turnoId?: string;
+      fromReservaId?: string;
+    }
+  | { kind: "lista_reserva"; reservaId: string }
+  | { kind: "open_desafio"; desafioId: string }
+  | { kind: "open_predio"; slug: string };
 
 export function profileNeedsUsername(_profile: JugateLaProfile | null): boolean {
   return false;
@@ -21,8 +38,20 @@ export function profileNeedsPhone(profile: JugateLaProfile | null): boolean {
   return !profile?.telefono?.trim();
 }
 
+export function profileNeedsBirthdate(profile: JugateLaProfile | null): boolean {
+  return !profile?.fecha_nacimiento?.trim();
+}
+
+export function profileNeedsIdentidadDesafio(profile: JugateLaProfile | null): boolean {
+  return profileNeedsBirthdate(profile) || !profile?.tiene_dni;
+}
+
 export function profileReadyForActions(profile: JugateLaProfile | null): boolean {
-  return !profileNeedsUsername(profile) && !profileNeedsPhone(profile);
+  return (
+    !profileNeedsUsername(profile) &&
+    !profileNeedsPhone(profile) &&
+    !profileNeedsBirthdate(profile)
+  );
 }
 
 export async function setPendingAction(action: PendingAction): Promise<void> {

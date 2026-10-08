@@ -16,6 +16,7 @@ import {
 import {
   clearPendingAction,
   peekPendingAction,
+  profileNeedsBirthdate,
   profileNeedsPhone,
   profileNeedsUsername,
   profileReadyForActions,
@@ -23,8 +24,11 @@ import {
   type PendingAction,
 } from "../lib/pending-action";
 import { supabase } from "../lib/supabase";
-import { mensajeErrorEquipo, rpcResponderSolicitud } from "@shared/equipos";
-import { showNotice } from "../ui";
+import { mensajeErrorEquipo, rpcPredioPublico, rpcResponderSolicitud } from "@shared/equipos";
+import { listarMisReservas } from "../lib/reserva";
+import { IconBtn, showNotice } from "../ui";
+import { PorLaCanchaBottomTabBar } from "../ui/PorLaCanchaBottomTabBar";
+import { CompleteBirthdateScreen } from "./auth/CompleteBirthdateScreen";
 import { CompletePhoneScreen } from "./auth/CompletePhoneScreen";
 import { CompleteUsernameScreen } from "./auth/CompleteUsernameScreen";
 import { ExplorarScreen } from "./ExplorarScreen";
@@ -42,12 +46,19 @@ import { InvitacionesScreen } from "./equipos/InvitacionesScreen";
 import { PlayersSearchScreen } from "./jugadores/PlayersSearchScreen";
 import { PlayerPublicProfileScreen } from "./jugadores/PlayerPublicProfileScreen";
 import { CrearPartidoScreen } from "./CrearPartidoScreen";
-import { HomeCaminosScreen } from "./HomeCaminosScreen";
+import { InicioScreen } from "./inicio/InicioScreen";
+import { PredioDetalleScreen } from "./predio/PredioDetalleScreen";
 import { ReservarCanchaScreen } from "./ReservarCanchaScreen";
+import { ReservaListaScreen } from "./ReservaListaScreen";
+import { ReservaDetalleScreen } from "./reserva/ReservaDetalleScreen";
+import { ReservaPlusWizard } from "./reserva/ReservaPlusWizard";
+import { ChevronLeft, iconStroke } from "../lib/icons";
 import type { SearchPlayer } from "../lib/player-search";
+import type { ReservaDraft } from "../lib/reserva-draft";
+import type { ReservaMia } from "../lib/reserva";
 
 type Tab = "explore" | "matches" | "teams" | "profile";
-type ExploreView = "hub" | "partidos" | "reservar";
+type ExploreView = "hub" | "partidos" | "reservar" | "predio";
 type TeamsView =
   | { name: "list" }
   | { name: "create" }
@@ -76,7 +87,7 @@ export function MainTabs({ onRequestAuth }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hideProfileNav, setHideProfileNav] = useState(false);
-  const [profileGate, setProfileGate] = useState<null | "username" | "phone">(null);
+  const [profileGate, setProfileGate] = useState<null | "username" | "phone" | "birthdate">(null);
   const [notifsOpen, setNotifsOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notificacion[]>([]);
   const [notifsLoading, setNotifsLoading] = useState(false);
@@ -86,6 +97,17 @@ export function MainTabs({ onRequestAuth }: Props) {
   const [plusSearch, setPlusSearch] = useState(false);
   const [plusPlayer, setPlusPlayer] = useState<SearchPlayer | null>(null);
   const [crearPartidoOpen, setCrearPartidoOpen] = useState(false);
+  const [reservaPlus, setReservaPlus] = useState<Partial<ReservaDraft> | null>(null);
+  const [reservaDetalle, setReservaDetalle] = useState<ReservaMia | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [listaReservaId, setListaReservaId] = useState<string | null>(null);
+  const [completarReservaId, setCompletarReservaId] = useState<string | null>(null);
+  const [reservePrefill, setReservePrefill] = useState<{
+    canchaId?: string;
+    turnoId?: string;
+    tipoCobro?: "sena" | "total";
+    acepto?: boolean;
+  } | null>(null);
   const [inscribir, setInscribir] = useState<{ desafio: Desafio; existing: InscripcionMia | null } | null>(null);
   const [mia, setMia] = useState<InscripcionMia | null>(null);
   const resumedKey = useRef<string | null>(null);
@@ -168,8 +190,7 @@ export function MainTabs({ onRequestAuth }: Props) {
     if (id) setSelectedId(id);
     setDetalle(null);
     setPreferMap(true);
-    setExploreView("partidos");
-    setTab("explore");
+    setTab("matches");
   };
 
   const openDesafio = (d: Desafio) => {
@@ -250,6 +271,10 @@ export function MainTabs({ onRequestAuth }: Props) {
       setProfileGate("phone");
       return;
     }
+    if (profileNeedsBirthdate(profile)) {
+      setProfileGate("birthdate");
+      return;
+    }
     await clearPendingAction();
     await run();
   };
@@ -264,6 +289,10 @@ export function MainTabs({ onRequestAuth }: Props) {
       setProfileGate("phone");
       return;
     }
+    if (profileNeedsBirthdate(profile)) {
+      setProfileGate("birthdate");
+      return;
+    }
     setProfileGate(null);
   }, [profile, profileGate]);
 
@@ -273,6 +302,7 @@ export function MainTabs({ onRequestAuth }: Props) {
     const go = async () => {
       const action = await peekPendingAction();
       if (cancelled || !action || action.kind === "join_token" || action.kind === "claim_reserva") return;
+      if (action.kind === "open_desafio" || action.kind === "open_predio") return;
       if (action.kind === "inscribir" && teamsLoading) return;
       if (action.kind !== "open_inbox" && action.kind !== "favorite" && !profileReadyForActions(profile)) return;
       const key = JSON.stringify(action);
@@ -313,6 +343,34 @@ export function MainTabs({ onRequestAuth }: Props) {
           setDetalle(d);
           void startInscribir(d);
         }
+        return;
+      }
+      if (action.kind === "reservar") {
+        setReservePrefill({
+          canchaId: action.canchaId,
+          turnoId: action.turnoId,
+          tipoCobro: action.tipoCobro,
+          acepto: action.acepto,
+        });
+        setExploreView(action.canchaId ? "predio" : "reservar");
+        setTab("explore");
+        return;
+      }
+      if (action.kind === "crear_partido") {
+        setCrearPartidoOpen(true);
+        return;
+      }
+      if (action.kind === "reserva_plus") {
+        setReservaPlus({
+          kind: "plus",
+          canchaId: action.canchaId,
+          turnoId: action.turnoId,
+          fromReservaId: action.fromReservaId,
+        });
+        return;
+      }
+      if (action.kind === "lista_reserva") {
+        setListaReservaId(action.reservaId);
       }
     };
     void go();
@@ -321,10 +379,52 @@ export function MainTabs({ onRequestAuth }: Props) {
     };
   }, [loggedIn, profile, loading, teamsLoading, items, refreshTeams, equipos]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const openLaunch = async () => {
+      const action = await peekPendingAction();
+      if (cancelled || !action) return;
+      if (action.kind !== "open_desafio" && action.kind !== "open_predio") return;
+      const key = JSON.stringify(action);
+      if (resumedKey.current === key) return;
+      resumedKey.current = key;
+      await clearPendingAction();
+      if (action.kind === "open_desafio") {
+        const d = await getDesafioPorId(action.desafioId);
+        if (cancelled || !d) return;
+        setTab("explore");
+        setExploreView("partidos");
+        setSelectedId(d.id);
+        setDetalle(d);
+        return;
+      }
+      const predio = await rpcPredioPublico(supabase, action.slug);
+      if (cancelled || !predio.ok) return;
+      const canchaId = typeof predio.id === "string" ? predio.id : "";
+      if (!canchaId) return;
+      setTab("explore");
+      setReservePrefill({ canchaId });
+      setExploreView("predio");
+    };
+    void openLaunch();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const crearPartido = () => {
-    if (needAuth()) return;
     setPlusOpen(true);
   };
+
+  useEffect(() => {
+    if (!loggedIn) {
+      setCompletarReservaId(null);
+      return;
+    }
+    void listarMisReservas().then((r) => {
+      setCompletarReservaId(r.data.find((x) => x.estado === "reservada")?.id ?? null);
+    });
+  }, [loggedIn, plusOpen]);
 
   const teamsBody = () => {
     if (teamsView.name === "create") {
@@ -418,6 +518,8 @@ export function MainTabs({ onRequestAuth }: Props) {
           <CompleteUsernameScreen />
         ) : loggedIn && profileGate === "phone" ? (
           <CompletePhoneScreen />
+        ) : loggedIn && profileGate === "birthdate" ? (
+          <CompleteBirthdateScreen />
         ) : inscribir ? (
           <InscribirEquipoScreen
             desafio={inscribir.desafio}
@@ -437,6 +539,33 @@ export function MainTabs({ onRequestAuth }: Props) {
               void refreshNotifs();
               void refreshDesafios().then((list) => {
                 const d = list.find((x) => x.id === id);
+                if (d) {
+                  setDetalle(d);
+                  setSelectedId(d.id);
+                }
+              });
+            }}
+          />
+        ) : reservaPlus ? (
+          <ReservaPlusWizard
+            captainTeams={equiposDondeEsCapitan(equipos)}
+            initial={reservaPlus}
+            loggedIn={loggedIn}
+            onRequestAuth={onRequestAuth}
+            onBack={() => setReservaPlus(null)}
+            onCreateTeam={() => {
+              setReservaPlus(null);
+              void queueOrRun({ kind: "create_team" }, () => {
+                setTeamsView({ name: "create" });
+                setTab("teams");
+              });
+            }}
+            onCreated={(desafioId) => {
+              setReservaPlus(null);
+              setReservePrefill(null);
+              setExploreView("hub");
+              void refreshDesafios().then(async (list) => {
+                const d = list.find((x) => x.id === desafioId) ?? (await getDesafioPorId(desafioId));
                 if (d) {
                   setDetalle(d);
                   setSelectedId(d.id);
@@ -527,12 +656,63 @@ export function MainTabs({ onRequestAuth }: Props) {
               void getInscripcionMia(detalle.id, ids, profile?.id).then(setMia);
             }}
           />
+        ) : reservaDetalle ? (
+          <ReservaDetalleScreen
+            reservaId={reservaDetalle.id}
+            initial={reservaDetalle}
+            onBack={() => setReservaDetalle(null)}
+            onPasarAPlus={(reservaId) => {
+              setReservaDetalle(null);
+              void queueOrRun({ kind: "reserva_plus", fromReservaId: reservaId }, () =>
+                setReservaPlus({ kind: "plus", fromReservaId: reservaId })
+              );
+            }}
+            onOpenPredio={(canchaId) => {
+              setReservaDetalle(null);
+              setCalendarOpen(false);
+              setReservePrefill({ canchaId });
+              setExploreView("predio");
+              setTab("explore");
+            }}
+          />
+        ) : listaReservaId ? (
+          <ReservaListaScreen reservaId={listaReservaId} onBack={() => setListaReservaId(null)} />
+        ) : calendarOpen ? (
+          <View style={styles.body}>
+            <View style={{ paddingTop: 48, paddingHorizontal: 8 }}>
+              <IconBtn onPress={() => setCalendarOpen(false)} label="Volver">
+                <ChevronLeft color={colors.gold} size={22} strokeWidth={iconStroke} />
+              </IconBtn>
+            </View>
+            <MisPartidosScreen
+              guest={!loggedIn}
+              onRequestAuth={onRequestAuth}
+              onOpenDesafio={(d) => {
+                setCalendarOpen(false);
+                openDesafio(d);
+              }}
+              onEditarConvocados={(d) => {
+                setCalendarOpen(false);
+                void startInscribir(d);
+              }}
+              onOpenReserva={(r) => {
+                setCalendarOpen(false);
+                setReservaDetalle(r);
+              }}
+            />
+          </View>
         ) : tab === "matches" ? (
-          <MisPartidosScreen
+          <ExplorarScreen
+            items={items}
+            loading={loading}
+            error={error}
             guest={!loggedIn}
-            onRequestAuth={onRequestAuth}
+            selectedId={selectedId}
+            preferMap={preferMap}
+            onSelectId={setSelectedId}
             onOpenDesafio={openDesafio}
-            onEditarConvocados={(d) => void startInscribir(d)}
+            unreadNotifs={unreadNotifs}
+            onOpenNotifs={openNotifs}
           />
         ) : tab === "profile" && loggedIn ? (
           <PerfilHub
@@ -569,39 +749,87 @@ export function MainTabs({ onRequestAuth }: Props) {
           />
         ) : tab === "teams" ? (
           teamsBody()
-        ) : exploreView === "reservar" ? (
-          <ReservarCanchaScreen
-            onBack={() => setExploreView("hub")}
-            onRequestAuth={onRequestAuth}
-            onDone={() => {
+        ) : exploreView === "predio" && reservePrefill?.canchaId ? (
+          <PredioDetalleScreen
+            canchaId={reservePrefill.canchaId}
+            initialTurnoId={reservePrefill.turnoId ?? null}
+            initialTipoCobro={reservePrefill.tipoCobro ?? null}
+            initialAcepto={reservePrefill.acepto ?? false}
+            partidos={items}
+            onBack={() => {
+              setReservePrefill(null);
               setExploreView("hub");
-              setTab("matches");
+            }}
+            onRequestAuth={onRequestAuth}
+            onOpenDesafio={openDesafio}
+            onArmarPlus={(turnoId) => {
+              const canchaId = reservePrefill?.canchaId;
+              void queueOrRun(
+                { kind: "reserva_plus", canchaId, turnoId },
+                () => setReservaPlus({ kind: "plus", canchaId, turnoId })
+              );
+            }}
+            onDone={() => {
+              setReservePrefill(null);
+              setExploreView("hub");
+              setTab("explore");
             }}
           />
-        ) : exploreView === "partidos" ? (
-          <ExplorarScreen
+        ) : exploreView === "reservar" ? (
+          <ReservarCanchaScreen
+            onBack={() => {
+              setReservePrefill(null);
+              setExploreView("hub");
+            }}
+            onRequestAuth={onRequestAuth}
+            initialCanchaId={reservePrefill?.canchaId ?? null}
+            initialTurnoId={reservePrefill?.turnoId ?? null}
+            initialTipoCobro={reservePrefill?.tipoCobro ?? null}
+            initialAcepto={reservePrefill?.acepto ?? false}
+            onDone={() => {
+              setReservePrefill(null);
+              setExploreView("hub");
+              setTab("explore");
+            }}
+          />
+        ) : (
+          <InicioScreen
+            guest={!loggedIn}
             items={items}
             loading={loading}
             error={error}
-            guest={!loggedIn}
-            selectedId={selectedId}
-            preferMap={preferMap}
-            onSelectId={setSelectedId}
-            onOpenDesafio={openDesafio}
-            unreadNotifs={loggedIn ? unreadNotifs : 0}
+            unreadNotifs={unreadNotifs}
             onOpenNotifs={loggedIn ? openNotifs : undefined}
-          />
-        ) : (
-          <HomeCaminosScreen
-            unreadNotifs={loggedIn ? unreadNotifs : 0}
-            onOpenNotifs={loggedIn ? openNotifs : undefined}
+            onRefresh={refreshDesafios}
             onReservar={() => {
-              if (needAuth()) return;
+              setReservePrefill(null);
               setExploreView("reservar");
             }}
-            onPartidos={() => {
+            onArmar={() => {
+              void queueOrRun({ kind: "crear_partido" }, () => setCrearPartidoOpen(true));
+            }}
+            onOpenDesafio={openDesafio}
+            onOpenReserva={(r) => setReservaDetalle(r)}
+            onVerPartidos={() => {
               setPreferMap(false);
-              setExploreView("partidos");
+              setTab("matches");
+            }}
+            onVerProximos={() => {
+              if (needAuth()) return;
+              setCalendarOpen(true);
+            }}
+            onOpenPredio={(canchaId) => {
+              setReservePrefill({ canchaId });
+              setExploreView("predio");
+            }}
+            onReservarTurno={(canchaId, turnoId) => {
+              setReservePrefill({ canchaId, turnoId });
+              setExploreView("predio");
+            }}
+            onRequestAuth={onRequestAuth}
+            onOpenZona={() => {
+              if (needAuth()) return;
+              setTab("profile");
             }}
           />
         )}
@@ -609,8 +837,13 @@ export function MainTabs({ onRequestAuth }: Props) {
       {!detalle &&
       !notifsOpen &&
       !inscribir &&
+      !calendarOpen &&
+      !listaReservaId &&
+      !reservaDetalle &&
       !crearPartidoOpen &&
+      !reservaPlus &&
       exploreView !== "reservar" &&
+      exploreView !== "predio" &&
       !plusSearch &&
       !plusPlayer &&
       !hideProfileNav &&
@@ -627,10 +860,12 @@ export function MainTabs({ onRequestAuth }: Props) {
               return;
             }
             if (next === "matches") {
+              setPreferMap(false);
               setTab("matches");
               return;
             }
             if (next === "teams") {
+              if (needAuth()) return;
               setTab("teams");
               refreshTeams();
               return;
@@ -647,32 +882,32 @@ export function MainTabs({ onRequestAuth }: Props) {
       <PlusActionsSheet
         visible={plusOpen}
         onClose={() => setPlusOpen(false)}
-        onCrearEquipo={() => {
+        onReservarCancha={() => {
           setPlusOpen(false);
-          void queueOrRun({ kind: "create_team" }, () => {
-            setTeamsView({ name: "create" });
-            setTab("teams");
-          });
-        }}
-        onBuscarJugadores={() => {
-          setPlusOpen(false);
-          setPlusSearch(true);
-        }}
-        onUnirmeEnlace={() => {
-          setPlusOpen(false);
-          setJoinOpen(true);
-        }}
-        onBuscarDesafio={() => {
-          setPlusOpen(false);
-          setPreferMap(true);
-          setExploreView("partidos");
+          setReservePrefill(null);
+          setExploreView("reservar");
           setTab("explore");
         }}
-        onPublicarPartido={() => {
+        onArmarPartido={() => {
           setPlusOpen(false);
-          if (needAuth()) return;
-          setCrearPartidoOpen(true);
+          void queueOrRun({ kind: "crear_partido" }, () => setCrearPartidoOpen(true));
         }}
+        onCompletarPartido={
+          completarReservaId
+            ? () => {
+                const id = completarReservaId;
+                setPlusOpen(false);
+                void listarMisReservas().then((r) => {
+                  const found = r.data.find((x) => x.id === id) ?? null;
+                  if (found) {
+                    setReservaDetalle(found);
+                    return;
+                  }
+                  void queueOrRun({ kind: "lista_reserva", reservaId: id }, () => setListaReservaId(id));
+                });
+              }
+            : undefined
+        }
       />
       <UnirseEnlaceSheet
         visible={joinOpen}

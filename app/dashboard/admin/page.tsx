@@ -100,6 +100,14 @@ export default function AdminPrediosPage() {
       <p className="mt-1 text-sm text-[#1A2E4A]/70">
         Aprobá predios para que salgan en PorLaCancha. El piloto entra por el enlace de invitación.
       </p>
+      <div className="mt-3 flex flex-wrap gap-3 text-sm font-medium">
+        <Link href="/admin" className="text-[var(--fulbito-green)] underline">
+          Panel admin PorLaCancha (/admin)
+        </Link>
+        <Link href="/dashboard/admin/no-adheridos" className="text-[var(--fulbito-green)] underline">
+          Predios no adheridos
+        </Link>
+      </div>
 
       <form onSubmit={(e) => void invitar(e)} className="mt-6 space-y-3 rounded-xl border border-[#E0E0E0] bg-white p-4">
         <p className="font-medium text-[#1A2E4A]">Invitar predio piloto</p>

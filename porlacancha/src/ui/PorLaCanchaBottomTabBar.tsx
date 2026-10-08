@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { colors as palette } from "@shared/design";
 import { fontFamily } from "../lib/fonts";
-import { Compass, Plus, Shield, Trophy, UserRound } from "../lib/icons";
+import { Home, Plus, Shield, Trophy, UserRound } from "../lib/icons";
 import { hapticLight, hapticMedium } from "../lib/haptics";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,9 +19,9 @@ type Props = {
 export const BOTTOM_NAV_HEIGHT = 88;
 export const TAB_BAR_CONTENT_INSET = BOTTOM_NAV_HEIGHT + 56;
 
-const TABS: { id: BottomTabId; label: string; a11y: string; Icon: typeof Compass }[] = [
-  { id: "explore", label: "Explorar", a11y: "Explorar", Icon: Compass },
-  { id: "matches", label: "Mis partidos", a11y: "Mis partidos", Icon: Trophy },
+const TABS: { id: BottomTabId; label: string; a11y: string; Icon: typeof Home }[] = [
+  { id: "explore", label: "Inicio", a11y: "Inicio", Icon: Home },
+  { id: "matches", label: "Partidos", a11y: "Partidos", Icon: Trophy },
   { id: "teams", label: "Equipos", a11y: "Equipos", Icon: Shield },
   { id: "profile", label: "Perfil", a11y: "Perfil", Icon: UserRound },
 ];
@@ -36,7 +36,7 @@ function TabItem({
 }: {
   label: string;
   a11y: string;
-  Icon: typeof Compass;
+  Icon: typeof Home;
   selected: boolean;
   badge?: number;
   onPress: () => void;

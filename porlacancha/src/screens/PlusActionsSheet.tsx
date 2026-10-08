@@ -2,28 +2,24 @@ import { useEffect, useRef } from "react";
 import { Animated, Modal, PanResponder, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, space } from "@shared/design";
-import { Calendar, Link, MapPin, Search, Users, iconStroke } from "../lib/icons";
+import { Calendar, Users, iconStroke } from "../lib/icons";
 import { fontFamily } from "../lib/fonts";
 import { Button } from "../ui";
 
 type Props = {
   visible: boolean;
   onClose: () => void;
-  onCrearEquipo: () => void;
-  onBuscarJugadores: () => void;
-  onUnirmeEnlace: () => void;
-  onBuscarDesafio: () => void;
-  onPublicarPartido: () => void;
+  onReservarCancha: () => void;
+  onArmarPartido: () => void;
+  onCompletarPartido?: () => void;
 };
 
 export function PlusActionsSheet({
   visible,
   onClose,
-  onCrearEquipo,
-  onBuscarJugadores,
-  onUnirmeEnlace,
-  onBuscarDesafio,
-  onPublicarPartido,
+  onReservarCancha,
+  onArmarPartido,
+  onCompletarPartido,
 }: Props) {
   const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(420)).current;
@@ -123,30 +119,22 @@ export function PlusActionsSheet({
           <Text style={styles.h}>¿Qué querés hacer?</Text>
           <View style={styles.list}>
             <Button
-              label="Crear equipo"
-              onPress={onCrearEquipo}
-              icon={<Users color={colors.navyDark} size={20} strokeWidth={iconStroke} />}
-            />
-            <Button
-              label="Buscar jugadores"
-              onPress={onBuscarJugadores}
-              icon={<Search color={colors.navyDark} size={20} strokeWidth={iconStroke} />}
-            />
-            <Button
-              label="Unirme con enlace o código"
-              onPress={onUnirmeEnlace}
-              icon={<Link color={colors.navyDark} size={20} strokeWidth={iconStroke} />}
-            />
-            <Button
-              label="Buscar desafío cerca"
-              onPress={onBuscarDesafio}
-              icon={<MapPin color={colors.navyDark} size={20} strokeWidth={iconStroke} />}
-            />
-            <Button
-              label="Publicar partido"
-              onPress={onPublicarPartido}
+              label="Reservar cancha"
+              onPress={onReservarCancha}
               icon={<Calendar color={colors.navyDark} size={20} strokeWidth={iconStroke} />}
             />
+            <Button
+              label="Armar partido"
+              onPress={onArmarPartido}
+              icon={<Users color={colors.navyDark} size={20} strokeWidth={iconStroke} />}
+            />
+            {onCompletarPartido ? (
+              <Button
+                label="Completar mi partido"
+                onPress={onCompletarPartido}
+                icon={<Users color={colors.navyDark} size={20} strokeWidth={iconStroke} />}
+              />
+            ) : null}
           </View>
         </Animated.View>
       </View>

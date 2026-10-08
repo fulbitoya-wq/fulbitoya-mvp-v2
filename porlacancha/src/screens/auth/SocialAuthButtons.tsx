@@ -1,27 +1,18 @@
 /**
- * Google / Apple nativos: NO instalar todavía
- *   @react-native-google-signin/google-signin
- *   expo-apple-authentication
- * Rompen Expo Go. Cuando tengas credenciales:
- * 1) npx expo install @react-native-google-signin/google-signin expo-apple-authentication
- * 2) plugin en app.config.js (iosUrlScheme + google services)
- * 3) supabase.auth.signInWithIdToken({ provider: 'google'|'apple', token })
- * 4) definir las env EXPO_PUBLIC_GOOGLE_* y EXPO_PUBLIC_APPLE_AUTH_ENABLED=true
+ * Google y Apple entran por el navegador de Supabase (OAuth).
+ * No uses los SDK nativos: rompen Expo Go.
+ * En Supabase hay que tener los dos proveedores activos y estas URLs de retorno:
+ *   https://app.porlacancha.com/auth/callback
+ *   porlacancha://auth/callback
  */
+import { useState } from "react";
 import { fontFamily } from "../../lib/fonts";
 import { colors as palette, space } from "@shared/design";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
-
-function googleConfigured() {
-  return Boolean(
-    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID && process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
-  );
-}
-
-function appleConfigured() {
-  return process.env.EXPO_PUBLIC_APPLE_AUTH_ENABLED === "true";
-}
+import * as Linking from "expo-linking";
+import { supabase } from "../../lib/supabase";
+import { showNotice } from "../../ui";
 
 function GoogleMark() {
   return (
@@ -58,8 +49,32 @@ function AppleMark() {
 }
 
 export function SocialAuthButtons() {
-  const googleOn = googleConfigured();
-  const appleOn = appleConfigured();
+  const [busy, setBusy] = useState<"google" | "apple" | null>(null);
+
+  const entrar = async (provider: "google" | "apple") => {
+    if (busy) return;
+    setBusy(provider);
+    const redirectTo =
+      Platform.OS === "web" && typeof window !== "undefined"
+        ? `${window.location.origin}/auth/callback`
+        : Linking.createURL("auth/callback");
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo,
+        skipBrowserRedirect: Platform.OS !== "web",
+      },
+    });
+    if (error || !data?.url) {
+      setBusy(null);
+      showNotice("No se pudo entrar", "Revisá que Google o Apple estén activos en Supabase.");
+      return;
+    }
+    if (Platform.OS !== "web") {
+      await Linking.openURL(data.url);
+      setBusy(null);
+    }
+  };
 
   return (
     <View style={styles.wrap}>
@@ -69,8 +84,9 @@ export function SocialAuthButtons() {
         <View style={styles.sepLine} />
       </View>
       <Pressable
-        style={({ pressed }) => [styles.google, pressed && styles.pressed]}
-        disabled={!googleOn}
+        style={({ pressed }) => [styles.google, pressed && styles.pressed, busy === "google" && styles.pressed]}
+        disabled={busy !== null}
+        onPress={() => void entrar("google")}
         accessibilityRole="button"
         accessibilityLabel="Continuar con Google"
       >
@@ -81,8 +97,9 @@ export function SocialAuthButtons() {
         <View style={styles.side} />
       </Pressable>
       <Pressable
-        style={({ pressed }) => [styles.apple, pressed && styles.pressed]}
-        disabled={!appleOn}
+        style={({ pressed }) => [styles.apple, pressed && styles.pressed, busy === "apple" && styles.pressed]}
+        disabled={busy !== null}
+        onPress={() => void entrar("apple")}
         accessibilityRole="button"
         accessibilityLabel="Continuar con Apple"
       >

@@ -9,6 +9,8 @@
     "db:link": "node scripts/supabase-link.mjs",
     "db:push": "npx supabase@2.117.0 db push",
     "db:migrations": "npx supabase@2.117.0 migration list",
+    "prueba:static": "node scripts/prueba-matriz-static.mjs",
+    "prueba:mp-pago": "node scripts/plc-mp-pago-prueba.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

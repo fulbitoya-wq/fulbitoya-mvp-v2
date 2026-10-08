@@ -1,4 +1,5 @@
 import * as Linking from "expo-linking";
+import { Platform } from "react-native";
 import { supabase } from "./supabase";
 
 function paramsFromUrl(url: string): Record<string, string> {
@@ -28,9 +29,16 @@ export async function handleAuthCallbackUrl(url: string | null) {
 
   if (code) {
     await supabase.auth.exchangeCodeForSession(code);
+    limpiarUrlDeAuth();
     return;
   }
   if (access_token && refresh_token) {
     await supabase.auth.setSession({ access_token, refresh_token });
+    limpiarUrlDeAuth();
   }
+}
+
+function limpiarUrlDeAuth() {
+  if (Platform.OS !== "web" || typeof window === "undefined") return;
+  window.history.replaceState({}, "", "/");
 }

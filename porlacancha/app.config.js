@@ -23,6 +23,8 @@ module.exports = {
           "PorLaCancha usa la cámara para tu foto de perfil.",
         NSPhotoLibraryUsageDescription:
           "PorLaCancha usa tus fotos para el perfil y el escudo del equipo.",
+        NSLocationWhenInUseUsageDescription:
+          "PorLaCancha usa tu ubicación para mostrarte predios y canchas cerca tuyo.",
       },
     },
     android: {
@@ -42,11 +44,24 @@ module.exports = {
     },
     web: {
       favicon: "./assets/favicon.png",
+      name: "PorLaCancha",
+      shortName: "PorLaCancha",
+      lang: "es",
+      themeColor: "#001B44",
+      backgroundColor: "#001B44",
+      display: "standalone",
     },
     plugins: [
       "expo-font",
       "expo-asset",
       "expo-splash-screen",
+      [
+        "expo-location",
+        {
+          locationWhenInUsePermission:
+            "PorLaCancha usa tu ubicación para mostrarte predios y canchas cerca tuyo.",
+        },
+      ],
       [
         "react-native-maps",
         {

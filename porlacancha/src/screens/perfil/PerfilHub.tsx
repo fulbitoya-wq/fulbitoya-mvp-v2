@@ -5,13 +5,14 @@ import { equiposDondeEsCapitan, type EquipoListItem } from "../../lib/equipos";
 import { emptyFootball, loadFootballProfile, type FootballProfile } from "../../lib/perfil";
 import type { SearchPlayer } from "../../lib/player-search";
 import { ConfiguracionScreen } from "./ConfiguracionScreen";
+import { DatosPersonalesScreen } from "./DatosPersonalesScreen";
 import { EditarPerfilScreen } from "./EditarPerfilScreen";
 import { MiPerfilScreen } from "./MiPerfilScreen";
 import { PerfilPublicoScreen } from "./PerfilPublicoScreen";
 import { PlayerPublicProfileScreen } from "../jugadores/PlayerPublicProfileScreen";
 import { PlayersSearchScreen } from "../jugadores/PlayersSearchScreen";
 
-type ViewName = "home" | "edit" | "settings" | "public" | "search" | "player";
+type ViewName = "home" | "edit" | "settings" | "datos" | "public" | "search" | "player";
 
 type Props = {
   guest: boolean;
@@ -98,6 +99,22 @@ export function PerfilHub({
     );
   }
 
+  if (view === "datos" && profile) {
+    return (
+      <DatosPersonalesScreen
+        profile={profile}
+        football={football}
+        onBack={() => setView("settings")}
+        onUpdated={({ fechaNacimiento, tieneDni }) => {
+          if (fechaNacimiento !== undefined) {
+            setFootball((prev) => ({ ...prev, fechaNacimiento: fechaNacimiento ?? null }));
+          }
+          if (tieneDni) mergeProfile({ tiene_dni: true });
+        }}
+      />
+    );
+  }
+
   if (view === "settings" && profile) {
     return (
       <ConfiguracionScreen
@@ -106,6 +123,7 @@ export function PerfilHub({
         email={session?.user.email ?? profile.email}
         onBack={() => setView("home")}
         onEdit={() => setView("edit")}
+        onDatosPersonales={() => setView("datos")}
         onPublic={() => setView("public")}
         onSignOut={onSignOut}
       />
