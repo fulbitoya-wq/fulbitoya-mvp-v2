@@ -335,7 +335,7 @@ export function DesafioDetalleScreen({
               ? "Amistoso: el equipo que publica paga la cancha. Si se completa el rival, se devuelve la mitad. Podés sumarte suelto."
               : "Por la cancha: cada equipo paga lo que calcula el predio. Si no hay rival, se aplica la seña según el plazo."}
           </Mute>
-          <Mute>En este entorno el pago es de prueba: no pasa por Mercado Pago de FulbitoYa.</Mute>
+          <Mute>En este entorno el pago es de prueba: no pasa por Mercado Pago real.</Mute>
           {copyVisible ? <Text style={styles.body}>{copyVisible}</Text> : null}
 
           {amistoso && !guest && !inscriptoComo ? (

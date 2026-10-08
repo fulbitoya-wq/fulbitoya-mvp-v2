@@ -468,15 +468,20 @@ export function CrearPartidoScreen({
         </Mute>
 
         <Text style={[styles.h, { marginTop: space[16] }]}>¿Dónde juegan?</Text>
-        <View style={styles.rowWrap}>
+        <View style={styles.origenRow}>
           <Pressable
             onPress={() => setOrigen("fulbitoya")}
-            style={[styles.chip, origen === "fulbitoya" && styles.chipOn]}
+            style={[styles.origenCard, origen === "fulbitoya" && styles.origenCardOn]}
           >
-            <Text style={styles.chipT}>Predios FulbitoYa</Text>
+            <Text style={styles.origenTitle}>Nuestras canchas</Text>
+            <Text style={styles.origenSub}>Reservá y pagá en la app</Text>
           </Pressable>
-          <Pressable onPress={() => setOrigen("places")} style={[styles.chip, origen === "places" && styles.chipOn]}>
-            <Text style={styles.chipT}>Buscar en Google</Text>
+          <Pressable
+            onPress={() => setOrigen("places")}
+            style={[styles.origenCard, origen === "places" && styles.origenCardOn]}
+          >
+            <Text style={styles.origenTitle}>Agregar cancha</Text>
+            <Text style={styles.origenSub}>Una cancha que ya tenés alquilada</Text>
           </Pressable>
         </View>
 
@@ -484,7 +489,7 @@ export function CrearPartidoScreen({
           <>
             {loadErr ? <Mute>{loadErr}</Mute> : null}
             {turnosFmt.length === 0 ? (
-              <Mute>No hay turnos libres para {etiquetaTipo(formato)}. Probá buscar en Google.</Mute>
+              <Mute>No hay turnos libres para {etiquetaTipo(formato)}. Probá agregar una cancha.</Mute>
             ) : (
               turnosFmt.slice(0, 40).map((t) => (
                 <Pressable
@@ -512,7 +517,7 @@ export function CrearPartidoScreen({
             {placeCanchaId ? (
               <View style={styles.cardOn}>
                 <Text style={styles.body}>{placeLabel}</Text>
-                <Mute>{placeAdherido ? "Predio adherido" : "Cancha no adherida"}</Mute>
+                <Mute>{placeAdherido ? "Cancha en la app" : "Cancha no adherida"}</Mute>
                 <Pressable
                   onPress={() => {
                     setPlaceCanchaId(null);
@@ -761,6 +766,25 @@ const styles = StyleSheet.create({
   body: typeStyle("body", colors.white),
   err: { ...typeStyle("caption", colors.danger), marginTop: space[8] },
   rowWrap: { flexDirection: "row", flexWrap: "wrap", gap: space[8], marginVertical: space[8] },
+  origenRow: {
+    flexDirection: "row",
+    gap: space[8],
+    marginVertical: space[8],
+  },
+  origenCard: {
+    flex: 1,
+    minHeight: 88,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: space[12],
+    backgroundColor: colors.surface,
+    justifyContent: "center",
+    gap: space[4],
+  },
+  origenCardOn: { borderColor: colors.gold },
+  origenTitle: typeStyle("body", colors.white),
+  origenSub: typeStyle("caption", colors.textSecondary),
   chip: {
     borderWidth: 1,
     borderColor: colors.border,

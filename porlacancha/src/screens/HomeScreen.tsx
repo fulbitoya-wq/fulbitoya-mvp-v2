@@ -33,7 +33,7 @@ export function HomeScreen({
     }
     showNotice(
       "Publicar desafío",
-      "Pronto vas a poder crear un partido por plata desde acá. Hoy el predio ya puede publicarlo desde el panel de FulbitoYa."
+      "Pronto vas a poder crear un partido por plata desde acá. Hoy el predio ya puede publicarlo desde su panel."
     );
   };
 
