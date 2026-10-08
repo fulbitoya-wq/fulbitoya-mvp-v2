@@ -55,6 +55,7 @@ module.exports = {
       "expo-font",
       "expo-asset",
       "expo-splash-screen",
+      "@react-native-community/datetimepicker",
       [
         "expo-location",
         {

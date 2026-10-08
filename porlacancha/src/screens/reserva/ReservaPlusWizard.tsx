@@ -114,8 +114,8 @@ export function ReservaPlusWizard({
       setMiembros(d.miembros);
       setPicked((prev) => {
         if (prev.size > 0) return prev;
-        const cap = d.miembros.find((m) => m.rol === "capitan");
-        return new Set(cap ? [cap.usuario_id] : []);
+        const cap = d.miembros.find((m) => m.rol === "capitan" && m.usuario_id);
+        return new Set(cap?.usuario_id ? [cap.usuario_id] : []);
       });
     });
   }, [equipoId]);
@@ -399,18 +399,29 @@ export function ReservaPlusWizard({
             <Text style={styles.h}>
               Quiénes juegan ({selected.length}/{min})
             </Text>
-            {miembros.map((m) => {
-              const on = picked.has(m.usuario_id);
-              return (
-                <Pressable key={m.usuario_id} onPress={() => toggle(m.usuario_id)} style={styles.row}>
-                  <View style={[styles.box, on && styles.boxOn]} />
-                  <Text style={styles.body}>
-                    {m.nombre || (m.username ? `@${m.username}` : "Jugador")}
-                    {m.rol === "capitan" ? " · Capitán" : ""}
-                  </Text>
-                </Pressable>
-              );
-            })}
+            {miembros
+              .filter((m) => m.usuario_id && !m.es_invitado)
+              .map((m) => {
+                const uid = m.usuario_id!;
+                const on = picked.has(uid);
+                return (
+                  <Pressable key={m.miembro_id} onPress={() => toggle(uid)} style={styles.row}>
+                    <View style={[styles.box, on && styles.boxOn]} />
+                    <Text style={styles.body}>
+                      {m.nombre || (m.username ? `@${m.username}` : "Jugador")}
+                      {m.rol === "capitan" ? " · Capitán" : ""}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            {miembros
+              .filter((m) => m.es_invitado)
+              .map((m) => (
+                <View key={m.miembro_id} style={styles.row}>
+                  <View style={[styles.box, styles.boxOn]} />
+                  <Text style={styles.body}>{m.invitado_nombre || m.nombre || "Invitado"} · Sin cuenta</Text>
+                </View>
+              ))}
           </View>
         ) : null}
 

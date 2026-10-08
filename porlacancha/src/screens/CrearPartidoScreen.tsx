@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { esErrorIdentidadDesafio } from "@shared/equipos";
 import { colors, radius, space } from "@shared/design";
+import { rpcInvitarSinCuenta } from "@shared/equipos";
 import type { EquipoListItem, MiembroPlantel } from "../lib/equipos";
 import { getEquipoDetalle } from "../lib/equipos";
 import { etiquetaTipo, formatFechaCorta, formatHora, minimoConvocados } from "../lib/desafios";
@@ -21,8 +22,20 @@ import {
   type PlcReglaEmpate,
   type TurnoPublico,
 } from "../lib/plc";
+import { supabase } from "../lib/supabase";
 import { ChevronLeft, iconStroke } from "../lib/icons";
-import { Button, EmptyState, IconBtn, Mute, PlacesSearch, showNotice, type PlacePick } from "../ui";
+import {
+  Button,
+  DateField,
+  EmptyState,
+  IconBtn,
+  Mute,
+  PlacesSearch,
+  TimeField,
+  showNotice,
+  type PlacePick,
+} from "../ui";
+import { partidoDateBounds } from "../lib/fecha-ui";
 import { typeStyle } from "../ui/textStyle";
 import { CompleteIdentidadDesafioScreen } from "./auth/CompleteIdentidadDesafioScreen";
 
@@ -73,6 +86,8 @@ export function CrearPartidoScreen({
   const [busy, setBusy] = useState(false);
   const [needIdentidad, setNeedIdentidad] = useState(false);
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [invitadoNombre, setInvitadoNombre] = useState("");
+  const [invitando, setInvitando] = useState(false);
 
   const equipo = captainTeams.find((t) => t.id === equipoId);
   const formato =
@@ -80,6 +95,8 @@ export function CrearPartidoScreen({
       ? formatoLibre
       : ((equipo?.formato_habitual ?? formatoLibre).toLowerCase() as "f5" | "f7" | "f9" | "f11");
   const min = minimoConvocados(formato);
+  const conCuenta = useMemo(() => miembros.filter((m) => m.usuario_id && !m.es_invitado), [miembros]);
+  const invitados = useMemo(() => miembros.filter((m) => m.es_invitado), [miembros]);
   const esLibrePlaces =
     origen === "places" && !placeAdherido && (modalidad === "amistoso" || modalidad === "competitivo");
   const esDeposito =
@@ -101,10 +118,15 @@ export function CrearPartidoScreen({
     }
     void getEquipoDetalle(equipoId).then((d) => {
       setMiembros(d.miembros);
-      const cap = d.miembros.find((m) => m.rol === "capitan");
-      setPicked(new Set(cap ? [cap.usuario_id] : []));
+      const cap = d.miembros.find((m) => m.rol === "capitan" && m.usuario_id);
+      setPicked(new Set(cap?.usuario_id ? [cap.usuario_id] : []));
     });
   }, [equipoId, equipoModo]);
+
+  const reloadMiembros = async (id: string) => {
+    const d = await getEquipoDetalle(id);
+    setMiembros(d.miembros);
+  };
 
   const turnosFmt = useMemo(
     () => turnos.filter((t) => String(t.campo_tipo).toLowerCase() === formato),
@@ -163,13 +185,18 @@ export function CrearPartidoScreen({
   }, [esDeposito, origen, turnoId, precioCancha, formato, turnosFmt]);
 
   const selected = useMemo(() => [...picked], [picked]);
+  const cuposLibres = Math.max(0, min - selected.length - invitados.length);
   const turno = turnosFmt.find((t) => t.id === turnoId) ?? null;
 
   const toggle = (id: string) => {
     setPicked((prev) => {
       const n = new Set(prev);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
+      if (n.has(id)) {
+        // El capitán siempre queda convocado.
+        const cap = miembros.find((m) => m.rol === "capitan" && m.usuario_id);
+        if (cap?.usuario_id === id) return prev;
+        n.delete(id);
+      } else n.add(id);
       return n;
     });
   };
@@ -215,6 +242,33 @@ export function CrearPartidoScreen({
     setEquipoId(res.equipoId);
     setEquipoModo("equipo");
     return res.equipoId;
+  };
+
+  const agregarInvitado = async () => {
+    const nombre = invitadoNombre.trim();
+    if (!nombre) {
+      showNotice("Invitado", "Poné solo el nombre.");
+      return;
+    }
+    if (equipoModo === "sin_equipo") {
+      showNotice("Equipo", "Para sumar invitados elegí o creá un equipo.");
+      return;
+    }
+    setInvitando(true);
+    try {
+      const eq = await asegurarEquipo();
+      if (!eq) return;
+      const res = await rpcInvitarSinCuenta(supabase, eq, nombre);
+      if (!res.ok) {
+        showNotice("No se pudo agregar", res.error);
+        return;
+      }
+      setInvitadoNombre("");
+      await reloadMiembros(eq);
+      showNotice("Listo", `${nombre} quedó como invitado. Podés seguir con lugares libres.`);
+    } finally {
+      setInvitando(false);
+    }
   };
 
   const publicar = async () => {
@@ -322,21 +376,30 @@ export function CrearPartidoScreen({
     );
   }
 
-  const canPublishLibre =
-    esLibrePlaces &&
-    !!placeCanchaId &&
-    !!fecha &&
-    !!hora &&
-    (equipoModo === "sin_equipo" ||
-      (equipoModo === "nuevo" && nuevoNombre.trim().length > 0) ||
-      (equipoModo === "equipo" && (!!equipoId && (selected.length >= 1 || miembros.length === 0))));
+  const equipoListo =
+    equipoModo === "sin_equipo" ||
+    (equipoModo === "nuevo" && nuevoNombre.trim().length > 0) ||
+    (equipoModo === "equipo" && !!equipoId);
 
+  const canPublishLibre =
+    esLibrePlaces && !!placeCanchaId && !!fecha && !!hora && equipoListo;
+
+  // Alcanza con el capitán (u otro convocado con cuenta). Plantel completo = a la hora del partido.
   const canPublishDeposito =
     esDeposito &&
     aceptaTarifa &&
     equipoModo !== "sin_equipo" &&
+    equipoListo &&
     (origen === "fulbitoya" ? !!turnoId : !!placeCanchaId && !!fecha && !!hora) &&
-    selected.length >= min;
+    (selected.length >= 1 || equipoModo === "nuevo");
+
+  const canPublishPlus =
+    !esLibrePlaces &&
+    !esDeposito &&
+    !!turnoId &&
+    equipoModo === "equipo" &&
+    !!equipoId &&
+    selected.length >= 1;
 
   return (
     <View style={styles.fill}>
@@ -416,15 +479,20 @@ export function CrearPartidoScreen({
         </Mute>
 
         <Text style={[styles.h, { marginTop: space[16] }]}>¿Dónde juegan?</Text>
-        <View style={styles.rowWrap}>
+        <View style={styles.origenRow}>
           <Pressable
             onPress={() => setOrigen("fulbitoya")}
-            style={[styles.chip, origen === "fulbitoya" && styles.chipOn]}
+            style={[styles.origenCard, origen === "fulbitoya" && styles.origenCardOn]}
           >
-            <Text style={styles.chipT}>Predios FulbitoYa</Text>
+            <Text style={styles.origenTitle}>Nuestras canchas</Text>
+            <Text style={styles.origenSub}>Reservá y pagá en la app</Text>
           </Pressable>
-          <Pressable onPress={() => setOrigen("places")} style={[styles.chip, origen === "places" && styles.chipOn]}>
-            <Text style={styles.chipT}>Buscar en Google</Text>
+          <Pressable
+            onPress={() => setOrigen("places")}
+            style={[styles.origenCard, origen === "places" && styles.origenCardOn]}
+          >
+            <Text style={styles.origenTitle}>Agregar cancha</Text>
+            <Text style={styles.origenSub}>Una cancha que ya tenés alquilada</Text>
           </Pressable>
         </View>
 
@@ -432,7 +500,7 @@ export function CrearPartidoScreen({
           <>
             {loadErr ? <Mute>{loadErr}</Mute> : null}
             {turnosFmt.length === 0 ? (
-              <Mute>No hay turnos libres para {etiquetaTipo(formato)}. Probá buscar en Google.</Mute>
+              <Mute>{`No hay turnos libres para ${etiquetaTipo(formato)}. Probá agregar una cancha.`}</Mute>
             ) : (
               turnosFmt.slice(0, 40).map((t) => (
                 <Pressable
@@ -448,8 +516,9 @@ export function CrearPartidoScreen({
                     {t.barrio ? ` · ${t.barrio}` : ""}
                   </Text>
                   <Mute>
-                    {t.campo_nombre} · {formatFechaCorta(t.fecha)} · {formatHora(t.hora_inicio)}
-                    {t.precio != null ? ` · ${pesos(t.precio)}` : ""}
+                    {`${t.campo_nombre} · ${formatFechaCorta(t.fecha)} · ${formatHora(t.hora_inicio)}${
+                      t.precio != null ? ` · ${pesos(t.precio)}` : ""
+                    }`}
                   </Mute>
                 </Pressable>
               ))
@@ -460,7 +529,7 @@ export function CrearPartidoScreen({
             {placeCanchaId ? (
               <View style={styles.cardOn}>
                 <Text style={styles.body}>{placeLabel}</Text>
-                <Mute>{placeAdherido ? "Predio adherido" : "Cancha no adherida"}</Mute>
+                <Mute>{placeAdherido ? "Cancha en la app" : "Cancha no adherida"}</Mute>
                 <Pressable
                   onPress={() => {
                     setPlaceCanchaId(null);
@@ -476,20 +545,14 @@ export function CrearPartidoScreen({
             {placeCanchaId ? (
               <>
                 <Text style={[styles.h, { marginTop: space[16] }]}>Día y hora</Text>
-                <TextInput
+                <DateField
                   value={fecha}
-                  onChangeText={setFecha}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.textSecondary}
-                  style={styles.input}
+                  onChange={setFecha}
+                  minimumDate={partidoDateBounds().min}
+                  maximumDate={partidoDateBounds().max}
+                  placeholder="Elegí el día"
                 />
-                <TextInput
-                  value={hora}
-                  onChangeText={setHora}
-                  placeholder="HH:MM"
-                  placeholderTextColor={colors.textSecondary}
-                  style={[styles.input, { marginTop: space[8] }]}
-                />
+                <TimeField value={hora} onChange={setHora} placeholder="Elegí la hora" />
                 <Text style={[styles.h, { marginTop: space[16] }]}>Formato</Text>
                 <View style={styles.rowWrap}>
                   {(["f5", "f7", "f9", "f11"] as const).map((f) => (
@@ -578,8 +641,9 @@ export function CrearPartidoScreen({
           <View style={{ marginTop: space[12], gap: space[4] }}>
             <Text style={styles.h}>Desglose</Text>
             <Mute>
-              Cancha {pesos(cotDep.precio_cancha)} · Tarifa {pesos(cotDep.tarifa)} · Total por equipo{" "}
-              {pesos(cotDep.total_equipo)}
+              {`Cancha ${pesos(cotDep.precio_cancha)} · Tarifa ${pesos(cotDep.tarifa)} · Total por equipo ${pesos(
+                cotDep.total_equipo
+              )}`}
             </Mute>
             <Pressable onPress={() => setAceptaTarifa((v) => !v)} style={styles.row}>
               <View style={[styles.box, aceptaTarifa && styles.boxOn]} />
@@ -595,7 +659,7 @@ export function CrearPartidoScreen({
           <View style={{ marginTop: space[12], gap: space[4] }}>
             <Text style={styles.h}>Condiciones</Text>
             <Mute>{typeof cond.mensaje_tramo === "string" ? cond.mensaje_tramo : ""}</Mute>
-            <Mute>Cancha {pesos(cond.precio_cancha)} · tu equipo {pesos(cond.monto_equipo_a)}</Mute>
+            <Mute>{`Cancha ${pesos(cond.precio_cancha)} · tu equipo ${pesos(cond.monto_equipo_a)}`}</Mute>
           </View>
         ) : null}
 
@@ -612,29 +676,66 @@ export function CrearPartidoScreen({
           </Pressable>
         </View>
 
-        {equipoModo === "equipo" && miembros.length > 0 ? (
+        {equipoModo !== "sin_equipo" ? (
           <>
-            <Text style={[styles.h, { marginTop: space[16] }]}>
-              Quiénes juegan ({selected.length}/{min})
-            </Text>
-            {miembros.map((m) => {
-              const on = picked.has(m.usuario_id);
-              return (
-                <Pressable key={m.usuario_id} onPress={() => toggle(m.usuario_id)} style={styles.row}>
-                  <View style={[styles.box, on && styles.boxOn]} />
-                  <Text style={styles.body}>
-                    {m.nombre || (m.username ? `@${m.username}` : "Jugador")}
-                    {m.rol === "capitan" ? " · Capitán" : ""}
-                  </Text>
-                </Pressable>
-              );
-            })}
+            <Text style={[styles.h, { marginTop: space[16] }]}>Tu lado</Text>
+            <Mute>
+              {`Para publicar alcanza con el capitán. Sumá jugadores con cuenta, invitados por nombre o dejá lugares libres (${min} cupos). En por la cancha, si un lado está incompleto a la hora del partido, cuenta como walkover.`}
+            </Mute>
+            {conCuenta.length > 0 ? (
+              <>
+                <Text style={[styles.h, { marginTop: space[12] }]}>
+                  Convocados ({selected.length}/{min})
+                </Text>
+                {conCuenta.map((m) => {
+                  const uid = m.usuario_id!;
+                  const on = picked.has(uid);
+                  return (
+                    <Pressable key={m.miembro_id} onPress={() => toggle(uid)} style={styles.row}>
+                      <View style={[styles.box, on && styles.boxOn]} />
+                      <Text style={styles.body}>
+                        {m.nombre || (m.username ? `@${m.username}` : "Jugador")}
+                        {m.rol === "capitan" ? " · Capitán" : ""}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </>
+            ) : null}
+            {invitados.map((m) => (
+              <View key={m.miembro_id} style={styles.row}>
+                <View style={[styles.box, styles.boxOn]} />
+                <Text style={styles.body}>{m.invitado_nombre || m.nombre || "Invitado"} · Sin cuenta</Text>
+              </View>
+            ))}
+            {cuposLibres > 0 ? (
+              <View style={{ marginTop: space[8] }}>
+                <Mute>{cuposLibres === 1 ? "1 lugar libre" : `${cuposLibres} lugares libres`}</Mute>
+              </View>
+            ) : null}
+            <Text style={[styles.h, { marginTop: space[12] }]}>Invitado (solo nombre)</Text>
+            <TextInput
+              value={invitadoNombre}
+              onChangeText={setInvitadoNombre}
+              placeholder="Ej: Nico"
+              placeholderTextColor={colors.textSecondary}
+              style={styles.input}
+            />
+            <View style={{ marginTop: space[8] }}>
+              <Button
+                label={invitando ? "Agregando..." : "Agregar invitado"}
+                onPress={() => void agregarInvitado()}
+                variant="ghost"
+                disabled={invitando || busy}
+                loading={invitando}
+              />
+            </View>
           </>
         ) : null}
 
         {equipoModo === "equipo" && equipoId ? (
           <View style={{ marginTop: space[12] }}>
-            <Button label="Crear equipo (pantalla completa)" onPress={onCreateTeam} variant="ghost" />
+            <Button label="Ir a la sección Equipos" onPress={onCreateTeam} variant="ghost" />
           </View>
         ) : null}
 
@@ -652,11 +753,7 @@ export function CrearPartidoScreen({
             onPress={() => void publicar()}
             disabled={
               busy ||
-              (esLibrePlaces
-                ? !canPublishLibre
-                : esDeposito
-                  ? !canPublishDeposito
-                  : !turno || selected.length < min || miembros.length < min)
+              (esLibrePlaces ? !canPublishLibre : esDeposito ? !canPublishDeposito : !canPublishPlus)
             }
             loading={busy}
           />
@@ -674,6 +771,25 @@ const styles = StyleSheet.create({
   body: typeStyle("body", colors.white),
   err: { ...typeStyle("caption", colors.danger), marginTop: space[8] },
   rowWrap: { flexDirection: "row", flexWrap: "wrap", gap: space[8], marginVertical: space[8] },
+  origenRow: {
+    flexDirection: "row",
+    gap: space[8],
+    marginVertical: space[8],
+  },
+  origenCard: {
+    flex: 1,
+    minHeight: 88,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: space[12],
+    backgroundColor: colors.surface,
+    justifyContent: "center",
+    gap: space[4],
+  },
+  origenCardOn: { borderColor: colors.gold },
+  origenTitle: typeStyle("body", colors.white),
+  origenSub: typeStyle("caption", colors.textSecondary),
   chip: {
     borderWidth: 1,
     borderColor: colors.border,

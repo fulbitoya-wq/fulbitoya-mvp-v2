@@ -34,7 +34,7 @@ import {
 } from "../../lib/perfil";
 import { compressAvatarUri } from "../../lib/compress-avatar";
 import { supabase } from "../../lib/supabase";
-import { Button, IconBtn, PlayerAvatar, showAppDialog, showConfirm, showNotice } from "../../ui";
+import { BirthdateField, Button, IconBtn, PlayerAvatar, showAppDialog, showConfirm, showNotice } from "../../ui";
 import { typeStyle } from "../../ui/textStyle";
 import { fontFamily } from "../../lib/fonts";
 
@@ -235,7 +235,7 @@ export function EditarPerfilScreen({ profile, football, onBack, onSaved }: Props
     }
     const birth = nacimiento.trim();
     if (birth && !/^\d{4}-\d{2}-\d{2}$/.test(birth)) {
-      setError("La fecha de nacimiento va como AAAA-MM-DD");
+      setError("Elegí la fecha de nacimiento con el selector.");
       return;
     }
     let tarifa: number | null = null;
@@ -352,12 +352,7 @@ export function EditarPerfilScreen({ profile, football, onBack, onSaved }: Props
         {userMsg ? (
           <Text style={[styles.hint, userOk ? styles.ok : styles.err]}>{userOk ? `✓ ${userMsg}` : userMsg}</Text>
         ) : null}
-        <LabelInput
-          label="Fecha de nacimiento"
-          value={nacimiento}
-          onChangeText={setNacimiento}
-          placeholder="AAAA-MM-DD"
-        />
+        <BirthdateField value={nacimiento} onChange={setNacimiento} label="Fecha de nacimiento" />
         <Text style={styles.hint}>
           Privada (mín. 13 años). El DNI se carga en Configuración → Datos personales y no se puede cambiar después.
         </Text>

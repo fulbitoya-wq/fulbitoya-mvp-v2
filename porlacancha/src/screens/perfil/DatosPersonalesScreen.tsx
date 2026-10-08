@@ -9,7 +9,7 @@ import { useAuth } from "../../auth/AuthProvider";
 import { ChevronLeft, iconStroke } from "../../lib/icons";
 import type { FootballProfile } from "../../lib/perfil";
 import { supabase } from "../../lib/supabase";
-import { Button, Card, ErrorText, Field, IconBtn, Mute, showNotice } from "../../ui";
+import { BirthdateField, Button, Card, ErrorText, Field, IconBtn, Mute, showNotice } from "../../ui";
 import { typeStyle } from "../../ui/textStyle";
 
 const SOPORTE = "https://porlacancha.com/soporte";
@@ -90,12 +90,9 @@ export function DatosPersonalesScreen({ profile, football, onBack, onUpdated }: 
           <Mute>Obligatoria. Tenés que tener al menos 13 años.</Mute>
           {error && !modoDni ? <ErrorText>{error}</ErrorText> : null}
           <View style={{ marginTop: space[12], gap: space[12] }}>
-            <Field
-              placeholder="AAAA-MM-DD"
+            <BirthdateField
               value={fecha}
-              keyboardType="numbers-and-punctuation"
-              autoCapitalize="none"
-              onChangeText={(v) => {
+              onChange={(v) => {
                 setFecha(v);
                 if (error) setError(null);
               }}
@@ -126,12 +123,9 @@ export function DatosPersonalesScreen({ profile, football, onBack, onUpdated }: 
             <View style={{ marginTop: space[12], gap: space[12] }}>
               {error ? <ErrorText>{error}</ErrorText> : null}
               <Mute>Confirmá tu fecha de nacimiento e ingresá el DNI (solo números).</Mute>
-              <Field
-                placeholder="Fecha de nacimiento (AAAA-MM-DD)"
+              <BirthdateField
                 value={fecha}
-                keyboardType="numbers-and-punctuation"
-                autoCapitalize="none"
-                onChangeText={(v) => {
+                onChange={(v) => {
                   setFecha(v);
                   if (error) setError(null);
                 }}
