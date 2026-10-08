@@ -9,11 +9,14 @@ export type EquipoListItem = {
 };
 
 export type MiembroPlantel = {
-  usuario_id: string;
+  miembro_id: string;
+  usuario_id: string | null;
   rol: "capitan" | "jugador";
   estado: string;
   nombre: string | null;
   username: string | null;
+  es_invitado: boolean;
+  invitado_nombre: string | null;
 };
 
 export type SolicitudItem = {
@@ -79,18 +82,22 @@ export async function getEquipoDetalle(equipoId: string): Promise<{
 
   const { data: miembrosRows } = await supabase
     .from("equipo_miembros")
-    .select("usuario_id, rol, estado, usuarios(nombre, username)")
+    .select("id, usuario_id, rol, estado, es_invitado, invitado_nombre, usuarios(nombre, username)")
     .eq("equipo_id", equipoId)
     .eq("estado", "activo");
 
   const miembros: MiembroPlantel[] = (miembrosRows ?? []).map((row: any) => {
     const u = unwrap(row.usuarios) as { nombre?: string | null; username?: string | null } | null;
+    const esInv = Boolean(row.es_invitado) || row.usuario_id == null;
     return {
-      usuario_id: row.usuario_id,
+      miembro_id: String(row.id),
+      usuario_id: row.usuario_id ? String(row.usuario_id) : null,
       rol: row.rol,
       estado: row.estado,
-      nombre: u?.nombre ?? null,
-      username: u?.username ?? null,
+      nombre: esInv ? (row.invitado_nombre ?? u?.nombre ?? null) : (u?.nombre ?? null),
+      username: esInv ? null : (u?.username ?? null),
+      es_invitado: esInv,
+      invitado_nombre: row.invitado_nombre ?? null,
     };
   });
 

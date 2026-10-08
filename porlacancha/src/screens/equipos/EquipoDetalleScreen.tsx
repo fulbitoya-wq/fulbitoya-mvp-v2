@@ -200,17 +200,25 @@ export function EquipoDetalleScreen({ equipoId, onBack, onLeft, onBuscarJugadore
 
       <Text style={styles.h2}>Plantel</Text>
       {miembros.map((m) => (
-        <View key={m.usuario_id} style={styles.row}>
+        <View key={m.miembro_id} style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>{m.username ? `@${m.username}` : m.nombre ?? "Jugador"}</Text>
-            <Text style={styles.muted}>{m.rol === "capitan" ? "Capitán" : "Jugador"}</Text>
+            <Text style={styles.rowTitle}>
+              {m.es_invitado
+                ? m.invitado_nombre || m.nombre || "Invitado"
+                : m.username
+                  ? `@${m.username}`
+                  : m.nombre ?? "Jugador"}
+            </Text>
+            <Text style={styles.muted}>
+              {m.es_invitado ? "Invitado (sin cuenta)" : m.rol === "capitan" ? "Capitán" : "Jugador"}
+            </Text>
           </View>
-          {soyCapitan && m.usuario_id !== profile?.id ? (
+          {soyCapitan && m.usuario_id && m.usuario_id !== profile?.id ? (
             <View style={styles.actions}>
-              <Pressable onPress={() => transferir(m.usuario_id)}>
+              <Pressable onPress={() => transferir(m.usuario_id!)}>
                 <Text style={styles.link}>Capitanía</Text>
               </Pressable>
-              <Pressable onPress={() => expulsar(m.usuario_id)}>
+              <Pressable onPress={() => expulsar(m.usuario_id!)}>
                 <Text style={styles.danger}>Expulsar</Text>
               </Pressable>
             </View>
