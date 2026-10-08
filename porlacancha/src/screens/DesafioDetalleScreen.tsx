@@ -346,7 +346,7 @@ export function DesafioDetalleScreen({
           </Mute>
           <Mute>
             {porLaCancha && estadoInscripcion === "pendiente_pago"
-              ? "Ahora estás en modo prueba: al confirmar no se abre Mercado Pago, pero el depósito queda registrado igual."
+              ? "Tu equipo ya está anotado. Podés completar el plantel y pagar la cancha de anticipado cuando estés listo (antes del cierre). En modo prueba no se abre Mercado Pago."
               : "En este entorno el pago es de prueba: no pasa por Mercado Pago real."}
           </Mute>
           {copyVisible ? <Text style={styles.body}>{copyVisible}</Text> : null}
@@ -359,8 +359,14 @@ export function DesafioDetalleScreen({
         </View>
       </ScrollView>
 
-      <View style={[styles.sticky, { paddingBottom: insets.bottom + space[12] }]}>
-        <View>
+      <View
+        style={[
+          styles.sticky,
+          porLaCancha && estadoInscripcion === "pendiente_pago" ? styles.stickyCol : null,
+          { paddingBottom: insets.bottom + space[12] },
+        ]}
+      >
+        <View style={porLaCancha && estadoInscripcion === "pendiente_pago" ? undefined : { flexShrink: 0 }}>
           <Text style={styles.ctaKicker}>
             {estadoInscripcion === "pendiente_pago"
               ? porLaCancha
@@ -372,20 +378,32 @@ export function DesafioDetalleScreen({
           </Text>
           <Text style={styles.ctaPrize}>{stickyLabel}</Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <Button
-            label={busy && estadoInscripcion === "pendiente_pago" ? "Confirmando..." : ctaLabel}
-            onPress={() => {
-              if (estadoInscripcion === "pendiente_pago") {
-                void pagar();
-                return;
-              }
-              inscribir();
-            }}
-            disabled={ctaOff || busy}
-            loading={busy && estadoInscripcion === "pendiente_pago"}
-          />
-        </View>
+        {porLaCancha && estadoInscripcion === "pendiente_pago" ? (
+          <View style={{ gap: space[8], width: "100%" }}>
+            <Button
+              label={busy ? "Confirmando..." : "Pagar cancha de anticipado"}
+              onPress={() => void pagar()}
+              disabled={busy}
+              loading={busy}
+            />
+            <Button label="Completar plantel" variant="secondary" onPress={inscribir} disabled={busy} />
+          </View>
+        ) : (
+          <View style={{ flex: 1 }}>
+            <Button
+              label={busy && estadoInscripcion === "pendiente_pago" ? "Confirmando..." : ctaLabel}
+              onPress={() => {
+                if (estadoInscripcion === "pendiente_pago") {
+                  void pagar();
+                  return;
+                }
+                inscribir();
+              }}
+              disabled={ctaOff || busy}
+              loading={busy && estadoInscripcion === "pendiente_pago"}
+            />
+          </View>
+        )}
       </View>
     </View>
   );
@@ -462,6 +480,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: space[12],
+  },
+  stickyCol: {
+    flexDirection: "column",
+    alignItems: "stretch",
   },
   ctaKicker: typeStyle("caption", colors.textSecondary),
   ctaPrize: typeStyle("numM", colors.gold),
