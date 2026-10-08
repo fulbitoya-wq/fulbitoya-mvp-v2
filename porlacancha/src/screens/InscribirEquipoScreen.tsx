@@ -86,7 +86,7 @@ export function InscribirEquipoScreen({ desafio, captainTeams, existing, onBack,
         ? "Quedó la nueva lista. Podés seguir sumando jugadores."
         : res.ok && "estado" in res && res.estado === "pendiente_pago"
           ? porLaCancha
-            ? "Reservamos el lugar 15 minutos. Pagá la cancha de anticipado; después podés completar el plantel."
+            ? "Tu equipo quedó anotado. Completá el plantel cuando quieras y pagá la cancha de anticipado antes del cierre."
             : "Reservamos el lugar 15 minutos. Confirmá el pago de prueba en el partido."
           : "La inscripción quedó confirmada. Podés completar el plantel después."
     );
