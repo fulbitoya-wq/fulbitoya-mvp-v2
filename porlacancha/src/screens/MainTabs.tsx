@@ -943,8 +943,6 @@ export function MainTabs({ onRequestAuth }: Props) {
                 setSelectedId(d.id);
               }
             });
-            const ids = equipos.map((e) => e.id);
-            void getInscripcionMia(id, ids, profile?.id).then(setMia);
           }}
         />
       ) : null}
