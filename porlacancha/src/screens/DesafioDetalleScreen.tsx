@@ -349,6 +349,10 @@ export function DesafioDetalleScreen({
               ? "Ahora estás en modo prueba: al confirmar no se abre Mercado Pago, pero el depósito queda registrado igual."
               : "En este entorno el pago es de prueba: no pasa por Mercado Pago real."}
           </Mute>
+<<<<<<< HEAD
+=======
+          <Mute>En este entorno el pago es de prueba: no pasa por Mercado Pago real.</Mute>
+>>>>>>> origin/plc-inicio
           {copyVisible ? <Text style={styles.body}>{copyVisible}</Text> : null}
 
           {amistoso && !guest && !inscriptoComo ? (
