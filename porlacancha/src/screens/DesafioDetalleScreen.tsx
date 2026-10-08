@@ -212,7 +212,12 @@ export function DesafioDetalleScreen({
 
   return (
     <View style={styles.page}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={{
+          paddingBottom: porLaCancha && estadoInscripcion === "pendiente_pago" ? 220 : 140,
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
         <View>
           <PitchCover height={220} variant="flush">
             <View style={[styles.heroNav, { paddingTop: Math.max(insets.top, space[12]) }]}>
