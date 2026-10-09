@@ -693,14 +693,10 @@ export function MainTabs({ onRequestAuth }: Props) {
           <ReservaListaScreen reservaId={listaReservaId} onBack={() => setListaReservaId(null)} />
         ) : calendarOpen ? (
           <View style={styles.body}>
-            <View style={styles.calHeader}>
-              <IconBtn onPress={() => setCalendarOpen(false)} label="Volver">
-                <ChevronLeft color={colors.gold} size={22} strokeWidth={iconStroke} />
-              </IconBtn>
-            </View>
             <MisPartidosScreen
               guest={!loggedIn}
               onRequestAuth={onRequestAuth}
+              onBack={() => setCalendarOpen(false)}
               onOpenDesafio={(d) => {
                 setCalendarOpen(false);
                 openDesafio(d);
@@ -969,11 +965,4 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   body: { flex: 1 },
-  calHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    paddingTop: 48,
-    paddingHorizontal: 8,
-  },
 });
