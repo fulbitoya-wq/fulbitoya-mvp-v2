@@ -3,7 +3,6 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { esErrorIdentidadDesafio } from "@shared/equipos";
 import { colors, featureFlags, radius, space } from "@shared/design";
-import { rpcInvitarSinCuenta } from "@shared/equipos";
 import type { EquipoListItem, MiembroPlantel } from "../lib/equipos";
 import { getEquipoDetalle } from "../lib/equipos";
 import { etiquetaTipo, formatHora, minimoConvocados, normalizarTipo } from "../lib/desafios";
@@ -23,7 +22,6 @@ import {
   type PlcReglaEmpate,
   type TurnoPublico,
 } from "../lib/plc";
-import { supabase } from "../lib/supabase";
 import { ChevronLeft, iconStroke } from "../lib/icons";
 import {
   Button,
@@ -57,7 +55,7 @@ type Superficie = "cesped_natural" | "cesped_sintetico" | "tierra" | "cemento";
 export function CrearPartidoScreen({
   captainTeams,
   onBack,
-  onCreateTeam,
+  onCreateTeam: _onCreateTeam,
   onCreated,
   onTeamsChanged,
 }: Props) {
@@ -91,8 +89,6 @@ export function CrearPartidoScreen({
   const [busy, setBusy] = useState(false);
   const [needIdentidad, setNeedIdentidad] = useState(false);
   const [loadErr, setLoadErr] = useState<string | null>(null);
-  const [invitadoNombre, setInvitadoNombre] = useState("");
-  const [invitando, setInvitando] = useState(false);
   const [pagoCrear, setPagoCrear] = useState<{
     desafioId: string;
     inscripcionId: string;
@@ -149,11 +145,6 @@ export function CrearPartidoScreen({
       setPicked(new Set(cap?.usuario_id ? [cap.usuario_id] : []));
     });
   }, [equipoId, equipoModo]);
-
-  const reloadMiembros = async (id: string) => {
-    const d = await getEquipoDetalle(id);
-    setMiembros(d.miembros);
-  };
 
   const turnosFmt = useMemo(
     () => turnos.filter((t) => normalizarTipo(t.campo_tipo) === normalizarTipo(formato)),
@@ -355,33 +346,6 @@ export function CrearPartidoScreen({
     setEquipoId(res.equipoId);
     setEquipoModo("equipo");
     return res.equipoId;
-  };
-
-  const agregarInvitado = async () => {
-    const nombre = invitadoNombre.trim();
-    if (!nombre) {
-      showNotice("Invitado", "Poné solo el nombre.");
-      return;
-    }
-    if (equipoModo === "sin_equipo") {
-      showNotice("Equipo", "Para sumar invitados elegí o creá un equipo.");
-      return;
-    }
-    setInvitando(true);
-    try {
-      const eq = await asegurarEquipo();
-      if (!eq) return;
-      const res = await rpcInvitarSinCuenta(supabase, eq, nombre);
-      if (!res.ok) {
-        showNotice("No se pudo agregar", res.error);
-        return;
-      }
-      setInvitadoNombre("");
-      await reloadMiembros(eq);
-      showNotice("Listo", `${nombre} quedó como invitado. Podés seguir con lugares libres.`);
-    } finally {
-      setInvitando(false);
-    }
   };
 
   const publicar = async () => {
@@ -930,7 +894,7 @@ export function CrearPartidoScreen({
                 <Text style={[styles.h, { marginTop: space[16] }]}>
                   Convocados ({selected.length}/{min})
                 </Text>
-                <Mute>Con el capitán alcanza para publicar.</Mute>
+                <Mute>Con el capitán alcanza. Después sumás gente desde el partido.</Mute>
                 {conCuenta.map((m) => {
                   const uid = m.usuario_id!;
                   const on = picked.has(uid);
@@ -944,38 +908,10 @@ export function CrearPartidoScreen({
                     </Pressable>
                   );
                 })}
-                {invitados.map((m) => (
-                  <View key={m.miembro_id} style={styles.row}>
-                    <View style={[styles.box, styles.boxOn]} />
-                    <Text style={styles.body}>{m.invitado_nombre || m.nombre || "Invitado"} · Sin cuenta</Text>
-                  </View>
-                ))}
                 {cuposLibres > 0 ? (
                   <Mute>{cuposLibres === 1 ? "1 lugar libre" : `${cuposLibres} lugares libres`}</Mute>
                 ) : null}
-                <TextInput
-                  value={invitadoNombre}
-                  onChangeText={setInvitadoNombre}
-                  placeholder="Invitado (solo nombre)"
-                  placeholderTextColor={colors.textSecondary}
-                  style={[styles.input, { marginTop: space[8] }]}
-                />
-                <View style={{ marginTop: space[8] }}>
-                  <Button
-                    label={invitando ? "Agregando..." : "Agregar invitado"}
-                    onPress={() => void agregarInvitado()}
-                    variant="ghost"
-                    disabled={invitando || busy}
-                    loading={invitando}
-                  />
-                </View>
               </>
-            ) : null}
-
-            {equipoModo === "equipo" && equipoId ? (
-              <View style={{ marginTop: space[8] }}>
-                <Button label="Ir a Equipos" onPress={onCreateTeam} variant="ghost" />
-              </View>
             ) : null}
 
             <View style={{ marginTop: space[24] }}>
