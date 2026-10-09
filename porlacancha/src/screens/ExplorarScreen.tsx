@@ -249,19 +249,21 @@ export function ExplorarScreen({
     </View>
   );
 
-  const emptyNoZone = (
-    <EmptyState
-      title="Buscá una zona para ver partidos"
-      body="Activá tu ubicación o elegí una ciudad / barrio arriba."
-      action={<Button label="Usar mi ubicación" onPress={() => void pedirUbicacion()} />}
-    />
-  );
-
   const emptyNoMatches = (
     <EmptyState
-      title="No hay partidos cerca"
-      body="Probá otra zona o armá el tuyo."
-      action={onArmar ? <Button label="Armá el tuyo" onPress={onArmar} /> : undefined}
+      title={hasZone ? "No hay partidos cerca" : "No hay partidos"}
+      body={
+        hasZone
+          ? "Probá otra zona (ej. Monte Grande) o armá el tuyo."
+          : "Elegí una ciudad arriba para ordenar por cercanía, o armá el tuyo."
+      }
+      action={
+        hasZone ? (
+          onArmar ? <Button label="Armá el tuyo" onPress={onArmar} /> : undefined
+        ) : (
+          <Button label="Usar mi ubicación" onPress={() => void pedirUbicacion()} />
+        )
+      }
     />
   );
 
@@ -270,8 +272,6 @@ export function ExplorarScreen({
       <View style={styles.body}>
         {!bootLocDone ? (
           <Mute>Cargando…</Mute>
-        ) : !hasZone ? (
-          emptyNoZone
         ) : (
           <MapScreen
             items={filtered}
@@ -287,7 +287,7 @@ export function ExplorarScreen({
     ) : (
       <SectionList
         style={styles.body}
-        sections={hasZone ? sections : []}
+        sections={sections}
         keyExtractor={(item) => item.id}
         stickySectionHeadersEnabled
         contentContainerStyle={[styles.list, { paddingBottom: TAB_BAR_CONTENT_INSET }]}
@@ -296,11 +296,12 @@ export function ExplorarScreen({
           <View style={{ gap: space[8], marginBottom: space[8] }}>
             {loading ? <Mute>Cargando desafíos…</Mute> : null}
             {error ? <Text style={typeStyle("bodySmall", colors.danger)}>{error}</Text> : null}
+            {!hasZone && !loading && filtered.length > 0 ? (
+              <Mute>Mostrando todos. Elegí una zona para filtrar a 35 km.</Mute>
+            ) : null}
           </View>
         }
-        ListEmptyComponent={
-          !loading && bootLocDone ? (!hasZone ? emptyNoZone : emptyNoMatches) : null
-        }
+        ListEmptyComponent={!loading && bootLocDone ? emptyNoMatches : null}
         renderSectionHeader={({ section }) => (
           <View style={styles.dayHead}>
             <Text style={styles.dayHeadT}>{section.title}</Text>

@@ -20,6 +20,7 @@ import {
   rpcVerEnlacePago,
 } from "@shared/equipos";
 import { formatPremio } from "./desafios";
+import { arIsoDate } from "./fecha-ui";
 import { supabase } from "./supabase";
 import { webBaseUrl } from "./web-url";
 import type { TurnoPublico } from "./plc";
@@ -160,11 +161,7 @@ export function etiquetaEstadoReserva(estado: string, convertidaAPlus = false): 
 
 export function esReservaProxima(r: ReservaMia): boolean {
   if (r.estado !== "reservada") return false;
-  const hoy = new Date();
-  const y = hoy.getFullYear();
-  const m = String(hoy.getMonth() + 1).padStart(2, "0");
-  const d = String(hoy.getDate()).padStart(2, "0");
-  return r.fecha >= `${y}-${m}-${d}`;
+  return r.fecha >= arIsoDate(0);
 }
 
 function mapReservaMia(r: Record<string, unknown>): ReservaMia {
