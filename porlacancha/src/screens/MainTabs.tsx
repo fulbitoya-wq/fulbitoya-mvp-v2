@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, StyleSheet, Text, View } from "react-native";
+import { AppState, StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { colors, featureFlags } from "@shared/design";
 import { useAuth } from "../auth/AuthProvider";
