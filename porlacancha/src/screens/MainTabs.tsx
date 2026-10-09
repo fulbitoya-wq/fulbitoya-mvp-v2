@@ -720,6 +720,9 @@ export function MainTabs({ onRequestAuth }: Props) {
             preferMap={preferMap}
             onSelectId={setSelectedId}
             onOpenDesafio={openDesafio}
+            onArmar={() => {
+              void queueOrRun({ kind: "crear_partido" }, () => setCrearPartidoOpen(true));
+            }}
             unreadNotifs={unreadNotifs}
             onOpenNotifs={openNotifs}
           />
@@ -793,6 +796,10 @@ export function MainTabs({ onRequestAuth }: Props) {
             onRequestAuth={onRequestAuth}
             onOpenPredio={(canchaId) => {
               setReservePrefill({ canchaId });
+              setExploreView("predio");
+            }}
+            onReservarTurno={(canchaId, turnoId) => {
+              setReservePrefill({ canchaId, turnoId });
               setExploreView("predio");
             }}
             initialCanchaId={reservePrefill?.canchaId ?? null}

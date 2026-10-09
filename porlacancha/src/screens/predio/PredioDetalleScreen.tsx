@@ -59,7 +59,7 @@ import {
   Warehouse,
   iconStroke,
 } from "../../lib/icons";
-import { Button, FilterChip, Mute, showNotice } from "../../ui";
+import { Button, FilterChip, Mute, showNotice, showSuccess } from "../../ui";
 import { CanchaMap } from "../../ui/maps/CanchaMap";
 import { PagoQrCard } from "../../ui/PagoQrCard";
 import { typeStyle } from "../../ui/textStyle";
@@ -306,7 +306,7 @@ export function PredioDetalleScreen({
       return;
     }
     if ("reservaId" in res) {
-      showNotice("Reserva", "El turno quedó reservado.");
+      showSuccess("Tu turno quedó reservado", "Ya figura en Mis partidos. ¡A disfrutar la cancha!");
       onDone();
       return;
     }
@@ -690,7 +690,7 @@ export function PredioDetalleScreen({
                     holdId={qr.holdId}
                     accessToken={session.access_token}
                     onConfirmada={() => {
-                      showNotice("Reserva", "El pago se confirmó. El turno quedó reservado.");
+                      showSuccess("Tu turno quedó reservado", "El pago se confirmó. Ya figura en Mis partidos.");
                       onDone();
                     }}
                     onVencida={() => {

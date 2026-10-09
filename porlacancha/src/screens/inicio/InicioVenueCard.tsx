@@ -1,10 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from "react-native";
 import { colors, radius, space } from "@shared/design";
+import { CANCHA_DEFAULT } from "../../lib/default-cancha";
 import { formatHora } from "../../lib/desafios";
 import { MapPin, iconStroke } from "../../lib/icons";
 import { typeStyle } from "../../ui/textStyle";
 
-export type InicioTurnoChip = { id: string; hora: string };
+export type InicioTurnoChip = { id: string; hora: string; precioLabel?: string | null };
 
 type Props = {
   nombre: string;
@@ -12,6 +13,7 @@ type Props = {
   distancia: string | null;
   detalles: string;
   hours: InicioTurnoChip[];
+  imageUri?: string | null;
   onPressVenue?: () => void;
   onPressHour: (turnoId: string) => void;
 };
@@ -22,9 +24,12 @@ export function InicioVenueCard({
   distancia,
   detalles,
   hours,
+  imageUri,
   onPressVenue,
   onPressHour,
 }: Props) {
+  const source: ImageSourcePropType = imageUri ? { uri: imageUri } : CANCHA_DEFAULT;
+
   return (
     <View style={styles.card}>
       <Pressable
@@ -33,7 +38,7 @@ export function InicioVenueCard({
         accessibilityRole={onPressVenue ? "button" : undefined}
         style={styles.mainHit}
       >
-        <View style={styles.photo} />
+        <Image source={source} style={styles.photo} resizeMode="cover" />
         <View style={styles.bodyTop}>
           <View style={styles.titleRow}>
             <Text style={styles.name} numberOfLines={1}>
@@ -61,11 +66,12 @@ export function InicioVenueCard({
               onPress={() => onPressHour(h.id)}
               hitSlop={6}
               accessibilityRole="button"
-              accessibilityLabel={`Reservar ${formatHora(h.hora)}`}
+              accessibilityLabel={`Reservar ${formatHora(h.hora)}${h.precioLabel ? ` ${h.precioLabel}` : ""}`}
               style={styles.hourHit}
             >
               <View style={styles.hour}>
                 <Text style={styles.hourT}>{formatHora(h.hora)}</Text>
+                {h.precioLabel ? <Text style={styles.priceT}>{h.precioLabel}</Text> : null}
               </View>
             </Pressable>
           ))}
@@ -107,14 +113,17 @@ const styles = StyleSheet.create({
   hours: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
   hourHit: { minHeight: 48, justifyContent: "center" },
   hour: {
-    height: 40,
+    minHeight: 40,
     minWidth: 64,
     paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 13,
     borderWidth: 1,
     borderColor: "rgba(139,201,235,0.45)",
     alignItems: "center",
     justifyContent: "center",
+    gap: 2,
   },
   hourT: typeStyle("bodySmall", colors.white),
+  priceT: typeStyle("caption", colors.gold),
 });
