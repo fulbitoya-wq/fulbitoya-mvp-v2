@@ -99,11 +99,9 @@ export function ExplorarScreen({
     void (async () => {
       const loc = await getUserLocation();
       if (!live) return;
-      if (loc) {
-        setAnchor(loc);
-        setZona({ label: "Cerca mío", lat: loc.lat, lng: loc.lng, source: "gps" });
-        setHasZone(true);
-      }
+      // Solo ancla para ordenar por cercanía. No activar radio duro al boot:
+      // en local el GPS del browser suele quedar lejos del predio y escondía todo.
+      if (loc) setAnchor(loc);
       setBootLocDone(true);
     })();
     return () => {
@@ -114,11 +112,11 @@ export function ExplorarScreen({
   useEffect(() => {
     if (zona) {
       setAnchor({ lat: zona.lat, lng: zona.lng });
+      // Radio duro solo si el usuario eligió zona / “cerca mío” a mano.
       setHasZone(true);
     } else {
-      // Clearing the search must drop the GPS/places hard filter.
       setHasZone(false);
-      setAnchor(null);
+      // Mantener última ancla de GPS solo para ordenar, si había.
     }
   }, [zona]);
 
@@ -127,6 +125,13 @@ export function ExplorarScreen({
   }, [when, tipo, modo, hayLugar, zona?.lat, zona?.lng, hasZone]);
 
   const filtered = useMemo(() => {
+    const kmOf = (d: Desafio): number | null => {
+      if (!anchor) return null;
+      const lat = Number(d.lat);
+      const lng = Number(d.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return null;
+      return haversineKm(anchor, { lat, lng });
+    };
     return items
       .filter((d) => {
         if (when === "hoy" && !esHoy(d.fecha)) return false;
@@ -137,16 +142,12 @@ export function ExplorarScreen({
         if (modo === "cancha" && !esSoloCancha(Number(d.premio))) return false;
         if (hayLugar && (d.inscritos?.length ?? 0) >= (d.cupos || 2)) return false;
         const mine = Boolean(myUserId && d.owner_id && d.owner_id === myUserId);
-        // Tus partidos siempre entran: el radio “cerca mío” no te los esconde.
+        // Tus partidos siempre entran.
         if (mine) return true;
-        if (hasZone && anchor) {
-          const lat = Number(d.lat);
-          const lng = Number(d.lng);
-          // coalesce(lat,0) in crear_partido_* — (0,0) means "unknown", not Gulf of Guinea.
-          const missingCoords =
-            !Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0);
-          if (missingCoords) return true;
-          const km = haversineKm(anchor, { lat, lng });
+        // Radio duro solo con zona elegida a mano (Places / Cerca mío).
+        if (hasZone && anchor && zona) {
+          const km = kmOf(d);
+          if (km == null) return true;
           if (km > NEAR_KM) return false;
         }
         return true;
@@ -155,9 +156,14 @@ export function ExplorarScreen({
         const aMine = Boolean(myUserId && a.owner_id === myUserId) ? 0 : 1;
         const bMine = Boolean(myUserId && b.owner_id === myUserId) ? 0 : 1;
         if (aMine !== bMine) return aMine - bMine;
+        const ka = kmOf(a);
+        const kb = kmOf(b);
+        if (ka != null && kb != null && ka !== kb) return ka - kb;
+        if (ka != null && kb == null) return -1;
+        if (kb != null && ka == null) return 1;
         return inicioMs(a.fecha, a.hora_inicio) - inicioMs(b.fecha, b.hora_inicio);
       });
-  }, [items, when, tipo, modo, hayLugar, hasZone, anchor, myUserId]);
+  }, [items, when, tipo, modo, hayLugar, hasZone, anchor, myUserId, zona]);
 
   const sections = useMemo((): DaySection[] => {
     const slice = filtered.slice(0, visibleCount);
