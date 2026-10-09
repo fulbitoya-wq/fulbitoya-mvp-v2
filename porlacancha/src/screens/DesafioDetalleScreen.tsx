@@ -1,7 +1,12 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { esErrorIdentidadDesafio } from "@shared/equipos";
+import {
+  enlaceCompartirEquipo,
+  esErrorIdentidadDesafio,
+  rpcGenerarEnlaceEquipo,
+  rpcInvitarSinCuenta,
+} from "@shared/equipos";
 import { colors, featureFlags, radius, space } from "@shared/design";
 import { useAuth } from "../auth/AuthProvider";
 import {
@@ -15,20 +20,29 @@ import {
   formatHora,
   formatPremio,
   formatPremioArriba,
+  minimoConvocados,
   type Desafio,
 } from "../lib/desafios";
-import { cancelarInscripcion } from "../lib/inscripciones";
+import {
+  cancelarInscripcion,
+  listarConvocadosPlantel,
+  type ConvocadoPlantel,
+} from "../lib/inscripciones";
 import {
   confirmarPagoPrueba,
   inscribirJugadorAmistoso,
   montoAPagar,
   pesos,
 } from "../lib/plc";
+import { getEquipoDetalle } from "../lib/equipos";
 import { ChevronLeft, MapPin, Share2, iconStroke } from "../lib/icons";
 import { compartirTexto } from "../lib/share-text";
+import { supabase } from "../lib/supabase";
+import { webBaseUrl } from "../lib/web-url";
 import { Button, Chip, Mute, showConfirm, showNotice } from "../ui";
 import { CanchaMap } from "../ui/maps/CanchaMap";
 import { EquipoCupos } from "../ui/EquipoCupos";
+import { PlantelPitch } from "../ui/PlantelPitch";
 import { PitchCover } from "../ui/PitchCover";
 import { typeStyle } from "../ui/textStyle";
 import { CompleteIdentidadDesafioScreen } from "./auth/CompleteIdentidadDesafioScreen";
@@ -74,9 +88,15 @@ export function DesafioDetalleScreen({
   const lng = Number(desafio.lng);
 
   const [pago, setPago] = useState<{ total: number; cancha: number; servicio: number } | null>(null);
+  const [plantel, setPlantel] = useState<ConvocadoPlantel[]>([]);
+  const [equipoId, setEquipoId] = useState<string | null>(null);
+  const [invitadoNombre, setInvitadoNombre] = useState("");
+  const [invitando, setInvitando] = useState(false);
   const [busy, setBusy] = useState(false);
   const [needIdentidad, setNeedIdentidad] = useState(false);
   const porLaCancha = desafio.modalidad === "por_la_cancha";
+  const esCapitan = inscriptoComo === "capitan";
+  const minPlantel = minimoConvocados(desafio.tipo);
 
   const load = async () => {
     if (inscripcionId && estadoInscripcion === "pendiente_pago") {
@@ -86,11 +106,24 @@ export function DesafioDetalleScreen({
     } else {
       setPago(null);
     }
+    if (inscripcionId && (esCapitan || inscriptoComo === "miembro")) {
+      const list = await listarConvocadosPlantel(inscripcionId);
+      setPlantel(list);
+      const { data: insc } = await supabase
+        .from("desafio_inscripciones")
+        .select("equipo_id")
+        .eq("id", inscripcionId)
+        .maybeSingle();
+      setEquipoId(insc?.equipo_id ? String(insc.equipo_id) : null);
+    } else {
+      setPlantel([]);
+      setEquipoId(null);
+    }
   };
 
   useEffect(() => {
     void load();
-  }, [desafio.id, inscripcionId, estadoInscripcion, profile?.id]);
+  }, [desafio.id, inscripcionId, estadoInscripcion, profile?.id, inscriptoComo]);
 
   const cupoLleno = (desafio.inscritos?.length ?? 0) >= (desafio.cupos || 2);
   const rivalNombre =
@@ -116,7 +149,7 @@ export function DesafioDetalleScreen({
       : estadoInscripcion === "pendiente_pago" && !porLaCancha
         ? "Ver partido"
         : inscriptoComo === "capitan"
-          ? "Editar convocados"
+          ? "Armar equipo"
           : inscriptoComo === "miembro"
             ? "Tu equipo ya está"
             : cupoLleno && !amistoso
@@ -135,8 +168,65 @@ export function DesafioDetalleScreen({
       (inscriptoComo === "miembro" || (!inscriptoComo && cupoLleno && !amistoso))
   );
 
+  const linkPartido = () => {
+    const web = webBaseUrl();
+    return web ? `${web}/d/${desafio.id}` : `porlacancha://desafio/${desafio.id}`;
+  };
+
   const compartir = () => {
-    void compartirTexto(`${desafio.titulo} · ${etiquetaModalidad(Number(desafio.premio), desafio.modalidad)}`);
+    const when = `${formatFechaCorta(desafio.fecha)} ${formatHora(desafio.hora_inicio)}`;
+    const msg = `${desafio.titulo} · ${etiquetaModalidad(Number(desafio.premio), desafio.modalidad)}\n${when}\nSumate acá: ${linkPartido()}`;
+    void compartirTexto(msg);
+  };
+
+  const compartirEquipo = async () => {
+    if (!equipoId) {
+      showNotice("Equipo", "Todavía no hay equipo en este partido.");
+      return;
+    }
+    setBusy(true);
+    try {
+      let token: string | null = null;
+      const det = await getEquipoDetalle(equipoId);
+      token = det.enlaceToken;
+      if (!token) {
+        const res = await rpcGenerarEnlaceEquipo(supabase, equipoId);
+        if (!res.ok || !res.token) {
+          showNotice("Link", res.ok ? "No se pudo generar el link." : res.error);
+          return;
+        }
+        token = String(res.token);
+      }
+      const url = enlaceCompartirEquipo(token, webBaseUrl() || null);
+      await compartirTexto(`Entrá a mi equipo en PorLaCancha: ${url}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const agregarInvitado = async () => {
+    const nombre = invitadoNombre.trim();
+    if (!nombre) {
+      showNotice("Invitado", "Poné solo el nombre.");
+      return;
+    }
+    if (!equipoId) {
+      showNotice("Equipo", "Primero armá el equipo del partido.");
+      return;
+    }
+    setInvitando(true);
+    try {
+      const res = await rpcInvitarSinCuenta(supabase, equipoId, nombre);
+      if (!res.ok) {
+        showNotice("No se pudo agregar", res.error);
+        return;
+      }
+      setInvitadoNombre("");
+      showNotice("Listo", `${nombre} quedó en el plantel. Sumalo a la cancha con Armar equipo.`);
+      void load();
+    } finally {
+      setInvitando(false);
+    }
   };
 
   const pagar = async () => {
@@ -315,6 +405,61 @@ export function DesafioDetalleScreen({
             <Mute>{amistoso ? "Falta gente o un rival." : "Buscando rival."}</Mute>
           ) : null}
 
+          {esCapitan || inscriptoComo === "miembro" ? (
+            <View style={{ marginTop: space[20] }}>
+              <Text style={styles.h2}>Tu cancha</Text>
+              <Mute>
+                {esCapitan
+                  ? `Armá el ${etiquetaTipo(desafio.tipo)}: arquero y jugadores. Compartí el link para que se sumen.`
+                  : "Así queda el plantel en cancha."}
+              </Mute>
+              <PlantelPitch
+                tipo={desafio.tipo}
+                filled={plantel.map((p) => ({ id: p.usuarioId, label: p.label }))}
+                onPressEmpty={esCapitan ? () => onInscribir() : undefined}
+                onPressFilled={esCapitan ? () => onInscribir() : undefined}
+              />
+              {esCapitan ? (
+                <View style={{ gap: space[8], marginTop: space[12] }}>
+                  <Button label="Armar equipo" onPress={() => onInscribir()} />
+                  <Button
+                    label="Compartir link del partido"
+                    variant="secondary"
+                    onPress={compartir}
+                  />
+                  {equipoId ? (
+                    <Button
+                      label="Compartir link del equipo"
+                      variant="ghost"
+                      onPress={() => void compartirEquipo()}
+                      disabled={busy}
+                      loading={busy}
+                    />
+                  ) : null}
+                  <TextInput
+                    value={invitadoNombre}
+                    onChangeText={setInvitadoNombre}
+                    placeholder="Invitado (solo nombre)"
+                    placeholderTextColor={colors.textSecondary}
+                    style={styles.input}
+                  />
+                  <Button
+                    label={invitando ? "Agregando..." : "Agregar invitado"}
+                    variant="ghost"
+                    onPress={() => void agregarInvitado()}
+                    disabled={invitando || !equipoId}
+                    loading={invitando}
+                  />
+                  <Mute>
+                    {plantel.length < minPlantel
+                      ? `Llevás ${plantel.length} de ${minPlantel}. Con el capitán alcanza para publicar; completá antes del partido.`
+                      : "Plantel completo para el formato."}
+                  </Mute>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
           <Text style={styles.h2}>¿Cómo funciona?</Text>
           <Mute>
             {porLaCancha
@@ -464,4 +609,15 @@ const styles = StyleSheet.create({
   },
   ctaKicker: typeStyle("caption", colors.textSecondary),
   ctaPrize: typeStyle("numM", colors.gold),
+  input: {
+    marginTop: space[4],
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: "rgba(139,201,235,0.35)",
+    borderRadius: radius.md,
+    paddingHorizontal: space[12],
+    color: colors.white,
+    backgroundColor: colors.surface,
+    ...typeStyle("body", colors.white),
+  },
 });
