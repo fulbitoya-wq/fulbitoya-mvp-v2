@@ -36,6 +36,8 @@ type Props = {
   loading: boolean;
   error: string | null;
   guest?: boolean;
+  /** Para no filtrar por distancia los partidos que creaste vos. */
+  myUserId?: string | null;
   selectedId: string | null;
   preferMap?: boolean;
   onSelectId: (id: string | null) => void;
@@ -67,6 +69,7 @@ export function ExplorarScreen({
   items,
   loading,
   error,
+  myUserId = null,
   selectedId,
   preferMap,
   onSelectId,
@@ -133,6 +136,9 @@ export function ExplorarScreen({
         if (modo === "premio" && esSoloCancha(Number(d.premio))) return false;
         if (modo === "cancha" && !esSoloCancha(Number(d.premio))) return false;
         if (hayLugar && (d.inscritos?.length ?? 0) >= (d.cupos || 2)) return false;
+        const mine = Boolean(myUserId && d.owner_id && d.owner_id === myUserId);
+        // Tus partidos siempre entran: el radio “cerca mío” no te los esconde.
+        if (mine) return true;
         if (hasZone && anchor) {
           const lat = Number(d.lat);
           const lng = Number(d.lng);
@@ -145,8 +151,13 @@ export function ExplorarScreen({
         }
         return true;
       })
-      .sort((a, b) => inicioMs(a.fecha, a.hora_inicio) - inicioMs(b.fecha, b.hora_inicio));
-  }, [items, when, tipo, modo, hayLugar, hasZone, anchor]);
+      .sort((a, b) => {
+        const aMine = Boolean(myUserId && a.owner_id === myUserId) ? 0 : 1;
+        const bMine = Boolean(myUserId && b.owner_id === myUserId) ? 0 : 1;
+        if (aMine !== bMine) return aMine - bMine;
+        return inicioMs(a.fecha, a.hora_inicio) - inicioMs(b.fecha, b.hora_inicio);
+      });
+  }, [items, when, tipo, modo, hayLugar, hasZone, anchor, myUserId]);
 
   const sections = useMemo((): DaySection[] => {
     const slice = filtered.slice(0, visibleCount);

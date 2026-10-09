@@ -714,6 +714,7 @@ export function MainTabs({ onRequestAuth }: Props) {
             loading={loading}
             error={error}
             guest={!loggedIn}
+            myUserId={profile?.id}
             selectedId={selectedId}
             preferMap={preferMap}
             onSelectId={setSelectedId}
