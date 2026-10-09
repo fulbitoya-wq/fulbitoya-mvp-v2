@@ -37,6 +37,7 @@ import {
   type PlacePick,
 } from "../ui";
 import { partidoDateBounds } from "../lib/fecha-ui";
+import { formatDistanciaKm, getUserLocation, haversineKm, type LatLng } from "../lib/geo";
 import { etiquetaDiaCorto, fechasProximos } from "../lib/predio-detalle";
 import { typeStyle } from "../ui/textStyle";
 import { CompleteIdentidadDesafioScreen } from "./auth/CompleteIdentidadDesafioScreen";
@@ -100,6 +101,7 @@ export function CrearPartidoScreen({
     total: number;
   } | null>(null);
   const [pagando, setPagando] = useState(false);
+  const [userLoc, setUserLoc] = useState<LatLng | null>(null);
 
   const equipo = captainTeams.find((t) => t.id === equipoId);
   const formato =
@@ -120,6 +122,16 @@ export function CrearPartidoScreen({
       setTurnos(data);
       setLoadErr(error);
     });
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    void getUserLocation().then((loc) => {
+      if (live) setUserLoc(loc);
+    });
+    return () => {
+      live = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -145,24 +157,57 @@ export function CrearPartidoScreen({
     [turnos, formato]
   );
 
+  // Lista completa de predios de la plataforma (como Pista), cercanos primero.
   const prediosFy = useMemo(() => {
     const by: Record<
       string,
-      { id: string; nombre: string; barrio: string | null; nTurnos: number }
+      {
+        id: string;
+        nombre: string;
+        barrio: string | null;
+        nTurnos: number;
+        nTurnosFmt: number;
+        lat: number | null;
+        lng: number | null;
+        km: number | null;
+        distancia: string | null;
+      }
     > = {};
-    for (const t of turnosFmt) {
+    const fmtNorm = normalizarTipo(formato);
+    for (const t of turnos) {
       const cur = by[t.cancha_id] ?? {
         id: t.cancha_id,
         nombre: t.cancha_nombre,
         barrio: t.barrio,
         nTurnos: 0,
+        nTurnosFmt: 0,
+        lat: t.lat,
+        lng: t.lng,
+        km: null,
+        distancia: null,
       };
       if (!cur.barrio && t.barrio) cur.barrio = t.barrio;
+      if (cur.lat == null && t.lat != null) cur.lat = t.lat;
+      if (cur.lng == null && t.lng != null) cur.lng = t.lng;
       cur.nTurnos += 1;
+      if (normalizarTipo(t.campo_tipo) === fmtNorm) cur.nTurnosFmt += 1;
       by[t.cancha_id] = cur;
     }
-    return Object.values(by).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-  }, [turnosFmt]);
+    return Object.values(by)
+      .map((p) => {
+        const km =
+          userLoc && p.lat != null && p.lng != null
+            ? haversineKm(userLoc, { lat: p.lat, lng: p.lng })
+            : null;
+        return { ...p, km, distancia: formatDistanciaKm(km) };
+      })
+      .sort((a, b) => {
+        if (a.km != null && b.km != null) return a.km - b.km;
+        if (a.km != null) return -1;
+        if (b.km != null) return 1;
+        return a.nombre.localeCompare(b.nombre, "es");
+      });
+  }, [turnos, formato, userLoc]);
 
   const diasAgenda = useMemo(() => fechasProximos(14), []);
 
@@ -519,8 +564,8 @@ export function CrearPartidoScreen({
             }}
             style={[styles.origenCard, origen === "fulbitoya" && styles.origenCardOn]}
           >
-            <Text style={styles.origenTitle}>Nuestras canchas</Text>
-            <Text style={styles.origenSub}>Elegí predio, día y hora</Text>
+            <Text style={styles.origenTitle}>Canchas sugeridas</Text>
+            <Text style={styles.origenSub}>Predios cerca tuyo</Text>
           </Pressable>
           <Pressable
             onPress={() => {
@@ -540,10 +585,15 @@ export function CrearPartidoScreen({
           <>
             {loadErr ? <Mute>{loadErr}</Mute> : null}
             {prediosFy.length === 0 ? (
-              <Mute>{`No hay turnos libres para ${etiquetaTipo(formato)}. Probá “Ya la reservé”.`}</Mute>
+              <Mute>No hay predios con turnos libres. Probá “Ya la reservé”.</Mute>
             ) : !predioId ? (
               <>
-                <Text style={[styles.h, { marginTop: space[12] }]}>Predio</Text>
+                <Text style={[styles.h, { marginTop: space[12] }]}>Canchas sugeridas para ti</Text>
+                <Mute>
+                  {userLoc
+                    ? "Todas las canchas de la app, primero las más cerca."
+                    : "Todas las canchas de la app. Activá ubicación para ordenar por cercanía."}
+                </Mute>
                 {prediosFy.map((p) => (
                   <Pressable
                     key={p.id}
@@ -554,11 +604,18 @@ export function CrearPartidoScreen({
                     }}
                     style={styles.card}
                   >
-                    <Text style={styles.body}>
-                      {p.nombre}
-                      {p.barrio ? ` · ${p.barrio}` : ""}
-                    </Text>
-                    <Mute>{`${p.nTurnos} turno${p.nTurnos === 1 ? "" : "s"} libre${p.nTurnos === 1 ? "" : "s"}`}</Mute>
+                    <Text style={styles.body}>{p.nombre}</Text>
+                    <Mute>
+                      {[
+                        p.distancia,
+                        p.barrio,
+                        p.nTurnosFmt > 0
+                          ? `${p.nTurnosFmt} turno${p.nTurnosFmt === 1 ? "" : "s"} ${etiquetaTipo(formato)}`
+                          : `${p.nTurnos} turno${p.nTurnos === 1 ? "" : "s"} libre${p.nTurnos === 1 ? "" : "s"}`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </Mute>
                   </Pressable>
                 ))}
               </>
