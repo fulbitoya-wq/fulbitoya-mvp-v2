@@ -243,18 +243,14 @@ export function MisPartidosScreen({
                     p.rivalNombre ? ` vs ${p.rivalNombre}` : p.inscritos.length < 2 ? " · buscando rival" : ""
                   }`}
                 </Mute>
-                {editar || cancelar ? (
+                {editar ? (
+                  <Pressable onPress={() => onEditarConvocados(p)} style={styles.linkHit}>
+                    <Text style={styles.link}>Editar convocados</Text>
+                  </Pressable>
+                ) : null}
+                {cancelar ? (
                   <View style={styles.actions}>
-                    {editar ? (
-                      <Pressable onPress={() => onEditarConvocados(p)} style={styles.linkHit}>
-                        <Text style={styles.link}>Editar convocados</Text>
-                      </Pressable>
-                    ) : null}
-                    {cancelar ? (
-                      <Pressable onPress={() => pedirCancelar(p)} style={styles.linkHit}>
-                        <Text style={styles.danger}>Cancelar inscripción</Text>
-                      </Pressable>
-                    ) : null}
+                    <Button label="Cancelar inscripción" variant="danger" onPress={() => pedirCancelar(p)} />
                   </View>
                 ) : null}
               </View>
@@ -268,10 +264,10 @@ export function MisPartidosScreen({
 
 const styles = StyleSheet.create({
   tabs: { flexDirection: "row", flexWrap: "wrap", gap: space[8], marginTop: space[12], marginBottom: space[8] },
-  list: { paddingBottom: space[40], paddingTop: space[8] },
-  block: { marginBottom: space[16], gap: 4 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: space[8], marginBottom: space[8] },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: space[16], marginTop: space[8] },
+  list: { paddingBottom: space[120], paddingTop: space[8] },
+  block: { marginBottom: space[16], gap: space[8] },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: space[8] },
+  actions: { gap: space[8], marginTop: space[4] },
   linkHit: { minHeight: 44, justifyContent: "center" },
   link: typeStyle("bodySmall", colors.gold),
   danger: typeStyle("bodySmall", colors.danger),

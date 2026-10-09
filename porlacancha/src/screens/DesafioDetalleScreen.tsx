@@ -17,6 +17,7 @@ import {
   formatPremioArriba,
   type Desafio,
 } from "../lib/desafios";
+import { cancelarInscripcion } from "../lib/inscripciones";
 import {
   boolFlag,
   confirmarPagoPrueba,
@@ -46,6 +47,7 @@ type Props = {
   onInscribir: () => void;
   onOpenMap: () => void;
   onPaid?: () => void;
+  onCancelled?: () => void;
 };
 
 export function DesafioDetalleScreen({
@@ -58,6 +60,7 @@ export function DesafioDetalleScreen({
   onInscribir,
   onOpenMap,
   onPaid,
+  onCancelled,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
@@ -159,6 +162,42 @@ export function DesafioDetalleScreen({
     );
     onPaid?.();
     void load();
+  };
+
+  const pedirCancelar = () => {
+    if (!inscripcionId) return;
+    void (async () => {
+      let body = "El lugar queda libre. Los convocados se enteran por el aviso.";
+      if (estadoInscripcion === "confirmada") {
+        const m = await montoAPagar(inscripcionId);
+        if (m.ok && m.montoCancha > 0) {
+          body =
+            `Pagaste ${pesos(m.montoTotal)} (cancha ${pesos(m.montoCancha)}` +
+            (m.montoServicio > 0 ? ` + tarifa app ${pesos(m.montoServicio)}` : "") +
+            `).\n\nSe retiene la tarifa de uso de la app (${pesos(m.montoServicio)}).\n` +
+            `Te devolvemos ${pesos(m.montoCancha)} (la cancha).`;
+        }
+      }
+      showConfirm({
+        title: "Cancelar inscripción",
+        body,
+        cancelLabel: "Volver",
+        confirmLabel: "Cancelar inscripción",
+        danger: true,
+        onConfirm: () => {
+          setBusy(true);
+          void cancelarInscripcion(inscripcionId).then((res) => {
+            setBusy(false);
+            if (!res.ok) {
+              showNotice("No se pudo cancelar", res.error);
+              return;
+            }
+            showNotice("Inscripción cancelada", "Si correspondía, el reembolso de la cancha quedó registrado.");
+            onCancelled?.();
+          });
+        },
+      });
+    })();
   };
 
   if (needIdentidad) {
@@ -367,6 +406,21 @@ export function DesafioDetalleScreen({
           {amistoso && !guest && !inscriptoComo ? (
             <View style={{ marginTop: space[16] }}>
               <Button label="Anotarme suelto" variant="secondary" onPress={() => void suelto()} loading={busy} />
+            </View>
+          ) : null}
+
+          {inscriptoComo === "capitan" &&
+          inscripcionId &&
+          (estadoInscripcion === "confirmada" || estadoInscripcion === "pendiente_pago") &&
+          desafio.estado !== "cancelado" &&
+          desafio.estado !== "finalizado" ? (
+            <View style={{ marginTop: space[16] }}>
+              <Button
+                label="Cancelar inscripción"
+                variant="danger"
+                onPress={pedirCancelar}
+                disabled={busy}
+              />
             </View>
           ) : null}
         </View>
