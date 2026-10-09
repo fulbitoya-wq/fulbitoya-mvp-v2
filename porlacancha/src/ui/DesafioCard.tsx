@@ -1,5 +1,6 @@
 import { colors, space } from "@shared/design";
-import { StyleSheet, Text, View } from "react-native";
+import type { ReactNode } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../auth/AuthProvider";
 import {
   etiquetaModalidad,
@@ -22,9 +23,15 @@ type Props = {
   desafio: Desafio;
   onPress: () => void;
   compact?: boolean;
+  /** Chips extra (ej. Pendiente de pago) — van junto al estado dentro de la card */
+  extraChips?: ReactNode;
+  /** Texto bajo el cuerpo (ej. Capitán · equipo vs rival) */
+  subtitle?: string | null;
+  /** Acciones del partido (editar / cancelar) — dentro de la card */
+  footer?: ReactNode;
 };
 
-export function DesafioCard({ desafio, onPress, compact }: Props) {
+export function DesafioCard({ desafio, onPress, compact, extraChips, subtitle, footer }: Props) {
   const { profile } = useAuth();
   const solo = esSoloCancha(Number(desafio.premio));
   const predio = desafio.predio_nombre || desafio.direccion;
@@ -32,34 +39,39 @@ export function DesafioCard({ desafio, onPress, compact }: Props) {
   const soyOrganizador = Boolean(profile?.id && desafio.owner_id && profile.id === desafio.owner_id);
 
   return (
-    <Card onPress={onPress} style={styles.card}>
-      <View style={styles.row}>
-        <PitchCover height={h} width={74} variant="thumb" />
-        <View style={styles.body}>
-          <View style={styles.chips}>
-            <Chip label={etiquetaEstado(desafio.estado)} tone={chipToneEstado(desafio.estado)} />
-            {soyOrganizador ? <Chip label="Organizador" tone="gold" /> : null}
-          </View>
-          <View style={styles.top}>
-            <View style={styles.when}>
-              <Text style={styles.dia}>{formatDiaSemana(desafio.fecha)}</Text>
-              <Text style={styles.hora}>{formatHora(desafio.hora_inicio)}</Text>
+    <Card style={styles.card}>
+      <Pressable onPress={onPress} accessibilityRole="button">
+        <View style={styles.row}>
+          <PitchCover height={h} width={74} variant="thumb" />
+          <View style={styles.body}>
+            <View style={styles.chips}>
+              <Chip label={etiquetaEstado(desafio.estado)} tone={chipToneEstado(desafio.estado)} />
+              {soyOrganizador ? <Chip label="Organizador" tone="gold" /> : null}
+              {extraChips}
             </View>
-            <View style={styles.copy}>
-              <Text style={styles.mod}>{etiquetaModalidad(Number(desafio.premio), desafio.modalidad)}</Text>
-              {solo ? null : <Text style={styles.prize}>{formatPremioArriba(Number(desafio.premio))}</Text>}
+            <View style={styles.top}>
+              <View style={styles.when}>
+                <Text style={styles.dia}>{formatDiaSemana(desafio.fecha)}</Text>
+                <Text style={styles.hora}>{formatHora(desafio.hora_inicio)}</Text>
+              </View>
+              <View style={styles.copy}>
+                <Text style={styles.mod}>{etiquetaModalidad(Number(desafio.premio), desafio.modalidad)}</Text>
+                {solo ? null : <Text style={styles.prize}>{formatPremioArriba(Number(desafio.premio))}</Text>}
+              </View>
             </View>
+            <View style={styles.meta}>
+              <MapPin color={colors.sky} size={14} strokeWidth={iconStroke} />
+              <Text style={styles.addr} numberOfLines={2}>
+                {predio}
+              </Text>
+            </View>
+            {desafio.barrio ? <Text style={styles.barrio}>{desafio.barrio}</Text> : null}
+            <EquipoCupos desafio={desafio} />
+            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </View>
-          <View style={styles.meta}>
-            <MapPin color={colors.sky} size={14} strokeWidth={iconStroke} />
-            <Text style={styles.addr} numberOfLines={2}>
-              {predio}
-            </Text>
-          </View>
-          {desafio.barrio ? <Text style={styles.barrio}>{desafio.barrio}</Text> : null}
-          <EquipoCupos desafio={desafio} />
         </View>
-      </View>
+      </Pressable>
+      {footer ? <View style={styles.footer}>{footer}</View> : null}
     </Card>
   );
 }
@@ -79,4 +91,12 @@ const styles = StyleSheet.create({
   meta: { flexDirection: "row", alignItems: "flex-start", gap: space[8] },
   addr: { flex: 1, ...typeStyle("bodySmall", colors.sky) },
   barrio: typeStyle("caption", colors.textSecondary),
+  subtitle: typeStyle("bodySmall", colors.textSecondary),
+  footer: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: space[12],
+    paddingVertical: space[10],
+    gap: space[8],
+  },
 });

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, space } from "@shared/design";
 import type { Desafio } from "../lib/desafios";
-import { etiquetaEstado, chipToneEstado } from "../lib/desafios";
 import { cancelarInscripcion } from "../lib/inscripciones";
+import { ChevronLeft, iconStroke } from "../lib/icons";
 import { montoAPagar, pesos } from "../lib/plc";
 import {
   esPartidoProximo,
@@ -21,11 +22,13 @@ import {
 } from "../lib/reserva";
 import {
   Button,
+  Card,
   Chip,
   DesafioCard,
   EmptyState,
   FilterChip,
   Heading,
+  IconBtn,
   Kicker,
   Mute,
   Screen,
@@ -33,7 +36,6 @@ import {
   showNotice,
 } from "../ui";
 import { typeStyle } from "../ui/textStyle";
-
 
 type Tab = "proximos" | "historial";
 
@@ -43,12 +45,20 @@ type Props = {
   onOpenDesafio: (d: Desafio) => void;
   onEditarConvocados: (d: Desafio) => void;
   onOpenReserva?: (reserva: ReservaMia) => void;
+  /** Si viene, es overlay de calendario: flecha arriba compacta, sin padding de tab bar */
+  onBack?: () => void;
 };
 
 function rolLabel(p: MiPartido): string {
   if (p.miRol === "capitan") return "Capitán";
   if (p.miRol === "convocado") return "Convocado";
   return "Plantel";
+}
+
+function partidoSubtitle(p: MiPartido): string {
+  return `${rolLabel(p)}${p.miEquipoNombre ? ` · ${p.miEquipoNombre}` : ""}${
+    p.rivalNombre ? ` vs ${p.rivalNombre}` : p.inscritos.length < 2 ? " · buscando rival" : ""
+  }`;
 }
 
 function ReservaRow({ r, onPress }: { r: ReservaMia; onPress?: () => void }) {
@@ -60,7 +70,7 @@ function ReservaRow({ r, onPress }: { r: ReservaMia; onPress?: () => void }) {
         ? "cancelled"
         : "pending";
   const body = (
-    <View style={styles.block}>
+    <Card style={styles.reservaCard} onPress={onPress}>
       <Chip label={etiquetaEstadoReserva(r.estado, r.convertida_a_plus)} tone={tone} />
       <Text style={styles.resT}>
         {r.cancha_nombre} · {r.campo_nombre}
@@ -76,14 +86,9 @@ function ReservaRow({ r, onPress }: { r: ReservaMia; onPress?: () => void }) {
         <Mute>{`Restan ${pesosReserva(r.resta_en_predio)} en el predio`}</Mute>
       ) : null}
       {onPress ? <Text style={styles.link}>Ver detalle →</Text> : null}
-    </View>
+    </Card>
   );
-  if (!onPress) return body;
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button">
-      {body}
-    </Pressable>
-  );
+  return body;
 }
 
 export function MisPartidosScreen({
@@ -92,12 +97,15 @@ export function MisPartidosScreen({
   onOpenDesafio,
   onEditarConvocados,
   onOpenReserva,
+  onBack,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>("proximos");
   const [items, setItems] = useState<MiPartido[]>([]);
   const [reservas, setReservas] = useState<ReservaMia[]>([]);
   const [loading, setLoading] = useState(!guest);
   const [error, setError] = useState<string | null>(null);
+  const embedded = Boolean(onBack);
 
   const load = useCallback(async () => {
     if (guest) {
@@ -148,8 +156,7 @@ export function MisPartidosScreen({
 
   const pedirCancelar = (p: MiPartido) => {
     void (async () => {
-      let body =
-        "El lugar queda libre. Los convocados se enteran por el aviso.";
+      let body = "El lugar queda libre. Los convocados se enteran por el aviso.";
       if (p.inscripcionId && p.inscripcionEstado === "confirmada") {
         const m = await montoAPagar(p.inscripcionId);
         if (m.ok && m.montoCancha > 0) {
@@ -181,11 +188,90 @@ export function MisPartidosScreen({
     })();
   };
 
+  const header = (
+    <>
+      {onBack ? (
+        <View style={[styles.backRow, { paddingTop: Math.max(insets.top, space[8]) }]}>
+          <IconBtn onPress={onBack} label="Volver">
+            <ChevronLeft color={colors.gold} size={22} strokeWidth={iconStroke} />
+          </IconBtn>
+        </View>
+      ) : null}
+      <Kicker>Calendario</Kicker>
+      <Heading>Mis partidos</Heading>
+      <View style={styles.tabs}>
+        <FilterChip label="Próximos" selected={tab === "proximos"} onPress={() => setTab("proximos")} />
+        <FilterChip label="Historial" selected={tab === "historial"} onPress={() => setTab("historial")} />
+      </View>
+    </>
+  );
+
+  const list = (
+    <>
+      {error ? <Mute>{error}</Mute> : null}
+      {reservasTab.length > 0 ? (
+        <View style={{ gap: space[8], marginBottom: space[16] }}>
+          <Text style={styles.sub}>Reservas</Text>
+          {reservasTab.map((r) => (
+            <ReservaRow key={r.id} r={r} onPress={onOpenReserva ? () => onOpenReserva(r) : undefined} />
+          ))}
+        </View>
+      ) : null}
+      {!loading && shown.length === 0 && reservasTab.length === 0 ? (
+        <EmptyState
+          title={tab === "proximos" ? "No tenés partidos próximos" : "Todavía no hay historial"}
+          body={
+            tab === "proximos"
+              ? "Cuando reserves o tu equipo se inscriba, aparece acá."
+              : "Acá van los que ya se jugaron, se cancelaron o ya pasó la hora."
+          }
+        />
+      ) : (
+        shown.map((p) => {
+          const editar = puedeEditarConvocados(p);
+          const cancelar = puedeCancelarInscripcion(p);
+          const extraChips = (
+            <>
+              {p.inscripcionEstado === "cancelada" ? (
+                <Chip label="Inscripción cancelada" tone="cancelled" />
+              ) : null}
+              {p.inscripcionEstado === "pendiente_pago" ? (
+                <Chip label="Pendiente de pago" tone="payment" />
+              ) : null}
+            </>
+          );
+          const footer =
+            editar || cancelar ? (
+              <View style={styles.footerActions}>
+                {editar ? (
+                  <Pressable onPress={() => onEditarConvocados(p)} style={styles.linkHit}>
+                    <Text style={styles.link}>Editar convocados</Text>
+                  </Pressable>
+                ) : null}
+                {cancelar ? (
+                  <Button label="Cancelar inscripción" variant="danger" onPress={() => pedirCancelar(p)} />
+                ) : null}
+              </View>
+            ) : null;
+          return (
+            <DesafioCard
+              key={`${p.id}-${p.inscripcionId ?? ""}`}
+              desafio={p}
+              onPress={() => onOpenDesafio(p)}
+              extraChips={extraChips}
+              subtitle={partidoSubtitle(p)}
+              footer={footer}
+            />
+          );
+        })
+      )}
+    </>
+  );
+
   if (guest) {
     return (
-      <Screen scroll tabBar>
-        <Kicker>Calendario</Kicker>
-        <Heading>Mis partidos</Heading>
+      <Screen scroll tabBar={!embedded}>
+        {header}
         <EmptyState
           title="Entrá para ver tus partidos"
           body="Cuando tu equipo se inscriba o te convoquen, aparecen acá."
@@ -195,82 +281,56 @@ export function MisPartidosScreen({
     );
   }
 
+  // Overlay calendario: sin padding fantasma de tab bar (el tab está oculto).
+  if (embedded) {
+    return (
+      <View style={styles.embed}>
+        <View style={styles.embedPad}>
+          {header}
+        </View>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: Math.max(insets.bottom, space[16]) + space[24], paddingHorizontal: space[20] },
+          ]}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.gold} />}
+        >
+          {list}
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <Screen tabBar>
-      <Kicker>Calendario</Kicker>
-      <Heading>Mis partidos</Heading>
-      <View style={styles.tabs}>
-        <FilterChip label="Próximos" selected={tab === "proximos"} onPress={() => setTab("proximos")} />
-        <FilterChip label="Historial" selected={tab === "historial"} onPress={() => setTab("historial")} />
-      </View>
+      {header}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.gold} />}
       >
-        {error ? <Mute>{error}</Mute> : null}
-        {reservasTab.length > 0 ? (
-          <View style={{ gap: space[8], marginBottom: space[16] }}>
-            <Text style={styles.sub}>Reservas</Text>
-            {reservasTab.map((r) => (
-              <ReservaRow key={r.id} r={r} onPress={onOpenReserva ? () => onOpenReserva(r) : undefined} />
-            ))}
-          </View>
-        ) : null}
-        {!loading && shown.length === 0 && reservasTab.length === 0 ? (
-          <EmptyState
-            title={tab === "proximos" ? "No tenés partidos próximos" : "Todavía no hay historial"}
-            body={
-              tab === "proximos"
-                ? "Cuando reserves o tu equipo se inscriba, aparece acá."
-                : "Acá van los que ya se jugaron, se cancelaron o ya pasó la hora."
-            }
-          />
-        ) : (
-          shown.map((p) => {
-            const editar = puedeEditarConvocados(p);
-            const cancelar = puedeCancelarInscripcion(p);
-            return (
-              <View key={`${p.id}-${p.inscripcionId ?? ""}`} style={styles.block}>
-                <View style={styles.chips}>
-                  <Chip label={etiquetaEstado(p.estado)} tone={chipToneEstado(p.estado)} />
-                  {p.inscripcionEstado === "cancelada" ? <Chip label="Inscripción cancelada" tone="cancelled" /> : null}
-                  {p.inscripcionEstado === "pendiente_pago" ? <Chip label="Pendiente de pago" tone="payment" /> : null}
-                </View>
-                <DesafioCard desafio={p} onPress={() => onOpenDesafio(p)} />
-                <Mute>
-                  {`${rolLabel(p)}${p.miEquipoNombre ? ` · ${p.miEquipoNombre}` : ""}${
-                    p.rivalNombre ? ` vs ${p.rivalNombre}` : p.inscritos.length < 2 ? " · buscando rival" : ""
-                  }`}
-                </Mute>
-                {editar ? (
-                  <Pressable onPress={() => onEditarConvocados(p)} style={styles.linkHit}>
-                    <Text style={styles.link}>Editar convocados</Text>
-                  </Pressable>
-                ) : null}
-                {cancelar ? (
-                  <View style={styles.actions}>
-                    <Button label="Cancelar inscripción" variant="danger" onPress={() => pedirCancelar(p)} />
-                  </View>
-                ) : null}
-              </View>
-            );
-          })
-        )}
+        {list}
       </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  embed: { flex: 1, backgroundColor: colors.navy },
+  embedPad: { paddingHorizontal: space[20] },
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: -space[12],
+    marginBottom: space[4],
+  },
   tabs: { flexDirection: "row", flexWrap: "wrap", gap: space[8], marginTop: space[12], marginBottom: space[8] },
-  list: { paddingBottom: space[120], paddingTop: space[8] },
-  block: { marginBottom: space[16], gap: space[8] },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: space[8] },
-  actions: { gap: space[8], marginTop: space[4] },
+  list: { paddingBottom: space[24], paddingTop: space[8] },
+  footerActions: { gap: space[8] },
   linkHit: { minHeight: 44, justifyContent: "center" },
   link: typeStyle("bodySmall", colors.gold),
-  danger: typeStyle("bodySmall", colors.danger),
   sub: { ...typeStyle("h3", colors.white), marginBottom: space[8] },
   resT: typeStyle("body", colors.white),
+  reservaCard: { gap: space[8], marginBottom: 0 },
 });

@@ -26,7 +26,7 @@ import {
 import { supabase } from "../lib/supabase";
 import { mensajeErrorEquipo, rpcPredioPublico, rpcResponderSolicitud } from "@shared/equipos";
 import { listarMisReservas } from "../lib/reserva";
-import { IconBtn, showNotice } from "../ui";
+import { showNotice } from "../ui";
 import { PorLaCanchaBottomTabBar } from "../ui/PorLaCanchaBottomTabBar";
 import { CompleteBirthdateScreen } from "./auth/CompleteBirthdateScreen";
 import { CompletePhoneScreen } from "./auth/CompletePhoneScreen";
@@ -53,7 +53,6 @@ import { ReservarCanchaScreen } from "./ReservarCanchaScreen";
 import { ReservaListaScreen } from "./ReservaListaScreen";
 import { ReservaDetalleScreen } from "./reserva/ReservaDetalleScreen";
 import { ReservaPlusWizard } from "./reserva/ReservaPlusWizard";
-import { ChevronLeft, iconStroke } from "../lib/icons";
 import type { SearchPlayer } from "../lib/player-search";
 import type { ReservaDraft } from "../lib/reserva-draft";
 import type { ReservaMia } from "../lib/reserva";
@@ -693,14 +692,10 @@ export function MainTabs({ onRequestAuth }: Props) {
           <ReservaListaScreen reservaId={listaReservaId} onBack={() => setListaReservaId(null)} />
         ) : calendarOpen ? (
           <View style={styles.body}>
-            <View style={styles.calHeader}>
-              <IconBtn onPress={() => setCalendarOpen(false)} label="Volver">
-                <ChevronLeft color={colors.gold} size={22} strokeWidth={iconStroke} />
-              </IconBtn>
-            </View>
             <MisPartidosScreen
               guest={!loggedIn}
               onRequestAuth={onRequestAuth}
+              onBack={() => setCalendarOpen(false)}
               onOpenDesafio={(d) => {
                 setCalendarOpen(false);
                 openDesafio(d);
@@ -969,11 +964,4 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   body: { flex: 1 },
-  calHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    paddingTop: 48,
-    paddingHorizontal: 8,
-  },
 });
