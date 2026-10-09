@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, radius, space } from "@shared/design";
 import { chipToneEstado, etiquetaEstado, formatFechaCorta, formatHora, type Desafio } from "../../lib/desafios";
 import { etiquetaEstadoReserva, type ReservaMia } from "../../lib/reserva";
@@ -6,13 +6,33 @@ import { Chip } from "../../ui";
 import { PitchCover } from "../../ui/PitchCover";
 import { typeStyle } from "../../ui/textStyle";
 
+function Escudo({ uri, nombre }: { uri?: string | null; nombre: string }) {
+  const initial = (nombre.trim()[0] || "?").toUpperCase();
+  if (uri) {
+    return <Image source={{ uri }} style={styles.escudo} accessibilityLabel={nombre} />;
+  }
+  return (
+    <View style={styles.escudoFallback} accessibilityLabel={nombre}>
+      <Text style={styles.escudoT}>{initial}</Text>
+    </View>
+  );
+}
+
 export function InicioUpcomingMatchCard({
   partido,
   onPress,
 }: {
-  partido: Desafio & { miEquipoNombre?: string | null; rivalNombre?: string | null };
+  partido: Desafio & {
+    miEquipoNombre?: string | null;
+    rivalNombre?: string | null;
+    miEquipoEscudo?: string | null;
+    rivalEscudo?: string | null;
+  };
   onPress: () => void;
 }) {
+  const mio = partido.miEquipoNombre || "Tu equipo";
+  const rival = partido.rivalNombre;
+
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={styles.card}>
       <View style={styles.head}>
@@ -20,11 +40,22 @@ export function InicioUpcomingMatchCard({
         <Text style={styles.hora}>{formatHora(partido.hora_inicio)}</Text>
         <Chip label={etiquetaEstado(partido.estado)} tone={chipToneEstado(partido.estado)} />
       </View>
-      {partido.miEquipoNombre || partido.rivalNombre ? (
-        <Text style={styles.vs} numberOfLines={1}>
-          {partido.miEquipoNombre || "Tu equipo"}
-          {partido.rivalNombre ? `  VS  ${partido.rivalNombre}` : ""}
-        </Text>
+      {partido.miEquipoNombre || rival ? (
+        <View style={styles.vsRow}>
+          <Escudo uri={partido.miEquipoEscudo} nombre={mio} />
+          <Text style={styles.teamName} numberOfLines={1}>
+            {mio}
+          </Text>
+          {rival ? (
+            <>
+              <Text style={styles.vsGold}>VS</Text>
+              <Escudo uri={partido.rivalEscudo} nombre={rival} />
+              <Text style={styles.teamName} numberOfLines={1}>
+                {rival}
+              </Text>
+            </>
+          ) : null}
+        </View>
       ) : (
         <Text style={styles.vs} numberOfLines={1}>
           {partido.titulo}
@@ -88,6 +119,21 @@ const styles = StyleSheet.create({
   dia: typeStyle("caption", colors.textSecondary),
   hora: typeStyle("h3", colors.white),
   vs: typeStyle("body", colors.white),
+  vsRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  teamName: { ...typeStyle("body", colors.white), flexShrink: 1, maxWidth: 96 },
+  vsGold: typeStyle("label", colors.gold),
+  escudo: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.navyDark },
+  escudoFallback: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.navyDark,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  escudoT: typeStyle("caption", colors.gold),
   meta: typeStyle("caption", colors.textSecondary),
   resRow: { flexDirection: "row", gap: 10, alignItems: "center" },
 });

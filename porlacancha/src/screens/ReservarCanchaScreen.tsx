@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, radius, space } from "@shared/design";
 import { useAuth } from "../auth/AuthProvider";
@@ -147,6 +147,14 @@ export function ReservarCanchaScreen({
     setQr(null);
   };
 
+  const montoSeleccionado = useMemo(() => {
+    if (!opciones || !tipo) return null;
+    const opt = tipo === "sena" ? opciones.opcion_sena : opciones.opcion_total;
+    return opt.disponible ? opt.monto_pagar : null;
+  }, [opciones, tipo]);
+
+  const [confirmPago, setConfirmPago] = useState(false);
+
   const continuar = async () => {
     if (!turnoId || !tipo || !acepto) return;
     if (!session?.access_token) {
@@ -160,6 +168,7 @@ export function ReservarCanchaScreen({
       onRequestAuth();
       return;
     }
+    setConfirmPago(false);
     setBusy(true);
     const res = await pagarReserva(turnoId, tipo, session.access_token);
     setBusy(false);
@@ -179,6 +188,12 @@ export function ReservarCanchaScreen({
     showNotice("Mercado Pago", "Te llevamos a pagar. Tenés 10 minutos para confirmar el turno.");
     onDone();
   };
+
+  const ctaLabel = (() => {
+    if (busy) return "Continuando...";
+    if (montoSeleccionado != null) return `Reservar y pagar ${pesosReserva(montoSeleccionado)}`;
+    return "Reservar y pagar";
+  })();
 
   const footerH = 72 + Math.max(insets.bottom, space[8]);
 
@@ -286,13 +301,45 @@ export function ReservarCanchaScreen({
       {!qr ? (
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space[8]) }]}>
           <Button
-            label={busy ? "Continuando..." : "Continuar →"}
-            onPress={() => void continuar()}
+            label={ctaLabel}
+            onPress={() => {
+              if (!canContinue) return;
+              setConfirmPago(true);
+            }}
             disabled={!canContinue}
             loading={busy}
           />
         </View>
       ) : null}
+
+      <Modal visible={confirmPago} transparent animationType="slide" onRequestClose={() => setConfirmPago(false)}>
+        <Pressable style={styles.modalBg} onPress={() => setConfirmPago(false)}>
+          <Pressable
+            style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, space[16]) + space[8] }]}
+            onPress={() => undefined}
+          >
+            <Text style={styles.modalH}>Confirmá el pago</Text>
+            <Mute>
+              {tipo === "sena"
+                ? "Vas a pagar la seña ahora. El resto se abona en el predio."
+                : "Vas a pagar el total del turno ahora."}
+            </Mute>
+            <Text style={[styles.modalKicker, { marginTop: space[16] }]}>Total a pagar</Text>
+            <Text style={styles.modalTotal}>
+              {montoSeleccionado != null ? pesosReserva(montoSeleccionado) : "—"}
+            </Text>
+            <View style={{ gap: space[8], marginTop: space[16] }}>
+              <Button
+                label={busy ? "Abriendo pago..." : "Ir a Mercado Pago"}
+                onPress={() => void continuar()}
+                loading={busy}
+                disabled={busy}
+              />
+              <Button label="Volver" variant="secondary" onPress={() => setConfirmPago(false)} disabled={busy} />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -334,4 +381,17 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
+  modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  modalSheet: {
+    backgroundColor: colors.navyDark,
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: space[20],
+    paddingTop: space[20],
+  },
+  modalH: typeStyle("h3", colors.white),
+  modalKicker: typeStyle("caption", colors.textSecondary),
+  modalTotal: typeStyle("numL", colors.gold),
 });

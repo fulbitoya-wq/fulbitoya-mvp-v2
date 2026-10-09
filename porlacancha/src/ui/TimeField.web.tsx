@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 import { colors, radius, space } from "@shared/design";
-import { halfHourSlots } from "../lib/fecha-ui";
+import { hourSlots } from "../lib/fecha-ui";
 import { typeStyle } from "./textStyle";
 
 type Props = {
@@ -10,7 +10,7 @@ type Props = {
   label?: string;
 };
 
-const SLOTS = halfHourSlots();
+const SLOTS = hourSlots();
 
 export function TimeField({ value, onChange, label }: Props) {
   const shown = value.slice(0, 5);

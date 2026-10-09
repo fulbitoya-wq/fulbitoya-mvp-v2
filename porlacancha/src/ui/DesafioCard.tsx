@@ -1,5 +1,6 @@
 import { colors, space } from "@shared/design";
 import { StyleSheet, Text, View } from "react-native";
+import { useAuth } from "../auth/AuthProvider";
 import {
   etiquetaModalidad,
   etiquetaEstado,
@@ -24,16 +25,21 @@ type Props = {
 };
 
 export function DesafioCard({ desafio, onPress, compact }: Props) {
+  const { profile } = useAuth();
   const solo = esSoloCancha(Number(desafio.premio));
   const predio = desafio.predio_nombre || desafio.direccion;
   const h = compact ? space[48] + space[48] + space[24] : space[48] + space[48] + space[48] + space[16];
+  const soyOrganizador = Boolean(profile?.id && desafio.owner_id && profile.id === desafio.owner_id);
 
   return (
     <Card onPress={onPress} style={styles.card}>
       <View style={styles.row}>
         <PitchCover height={h} width={74} variant="thumb" />
         <View style={styles.body}>
-              <Chip label={etiquetaEstado(desafio.estado)} tone={chipToneEstado(desafio.estado)} />
+          <View style={styles.chips}>
+            <Chip label={etiquetaEstado(desafio.estado)} tone={chipToneEstado(desafio.estado)} />
+            {soyOrganizador ? <Chip label="Organizador" tone="gold" /> : null}
+          </View>
           <View style={styles.top}>
             <View style={styles.when}>
               <Text style={styles.dia}>{formatDiaSemana(desafio.fecha)}</Text>
@@ -62,6 +68,7 @@ const styles = StyleSheet.create({
   card: { marginBottom: space[12], padding: 0, overflow: "hidden" },
   row: { flexDirection: "row" },
   body: { flex: 1, padding: space[12], gap: space[8], justifyContent: "center" },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: space[8] },
   top: { flexDirection: "row", gap: space[12] },
   when: { minWidth: 64 },
   copy: { flex: 1 },

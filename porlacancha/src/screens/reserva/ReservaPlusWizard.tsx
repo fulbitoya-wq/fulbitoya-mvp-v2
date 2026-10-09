@@ -5,7 +5,7 @@ import { esErrorIdentidadDesafio } from "@shared/equipos";
 import { colors, radius, space } from "@shared/design";
 import type { EquipoListItem, MiembroPlantel } from "../../lib/equipos";
 import { getEquipoDetalle } from "../../lib/equipos";
-import { etiquetaTipo, formatFechaCorta, formatHora, minimoConvocados } from "../../lib/desafios";
+import { etiquetaTipo, formatFechaCorta, formatHora, minimoConvocados, normalizarTipo } from "../../lib/desafios";
 import {
   cotizarReservaPlus,
   crearPartidoPlc,
@@ -121,7 +121,7 @@ export function ReservaPlusWizard({
   }, [equipoId]);
 
   const turnosFmt = useMemo(() => {
-    let list = turnos.filter((t) => String(t.campo_tipo).toLowerCase() === formato);
+    let list = turnos.filter((t) => normalizarTipo(t.campo_tipo) === normalizarTipo(formato));
     if (initial?.canchaId) list = list.filter((t) => t.cancha_id === initial.canchaId);
     return list;
   }, [turnos, formato, initial?.canchaId]);

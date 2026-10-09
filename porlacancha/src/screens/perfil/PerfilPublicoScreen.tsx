@@ -1,4 +1,4 @@
-import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image,  Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, radius, space } from "@shared/design";
 import type { EquipoListItem } from "../../lib/equipos";
@@ -7,7 +7,6 @@ import { displayName, formatosLabel, miembroDesde, type FootballProfile } from "
 import { Card, IconBtn, KvRow, Mute, PlayerAvatar, SectionTitle } from "../../ui";
 import { typeStyle } from "../../ui/textStyle";
 
-const fondoAzul = require("../../../assets/fondo-azul.jpeg");
 
 type PublicUser = {
   nombre: string | null;
@@ -31,7 +30,7 @@ export function PerfilPublicoScreen({ user, football, equipos, onBack, onOpenTea
   const desde = miembroDesde(user.created_at);
 
   return (
-    <ImageBackground source={fondoAzul} style={styles.fill} resizeMode="cover">
+    <View style={[styles.fill, { backgroundColor: colors.navy }]}>
       <View style={[styles.bar, { paddingTop: Math.max(insets.top, space[8]) }]}>
         <IconBtn onPress={onBack} label="Volver">
           <ChevronLeft color={colors.gold} size={22} strokeWidth={iconStroke} />
@@ -115,7 +114,7 @@ export function PerfilPublicoScreen({ user, football, equipos, onBack, onOpenTea
         <Text style={[styles.h, { marginTop: space[24] }]}>Reputación</Text>
         <Mute>Cuando juegue desafíos, acá van a figurar partidos completados y ausencias. Sin estrellas subjetivas.</Mute>
       </ScrollView>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -136,8 +135,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     paddingVertical: space[16],
-    marginBottom: space[16],
-  },
+    marginBottom: space[16] },
   actCol: { flex: 1, alignItems: "center" },
   actN: typeStyle("numM", colors.white),
   actL: typeStyle("caption", colors.textSecondary),
@@ -152,9 +150,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: space[12],
     marginBottom: space[8],
-    minHeight: 48,
-  },
+    minHeight: 48 },
   crest: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceElevated },
   eqN: typeStyle("h3", colors.white),
-  eqM: { flexDirection: "row", alignItems: "center", gap: 4 },
-});
+  eqM: { flexDirection: "row", alignItems: "center", gap: 4 } });

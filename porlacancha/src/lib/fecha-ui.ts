@@ -50,13 +50,16 @@ export function partidoDateBounds(): { min: Date; max: Date } {
   return { min, max };
 }
 
-/** Lista 00:00 … 23:30 cada 30 min. */
-export function halfHourSlots(): string[] {
+/** Lista 00:00 … 23:00 cada 1 h (sin medias). */
+export function hourSlots(): string[] {
   const out: string[] = [];
   for (let h = 0; h < 24; h++) {
-    for (const m of [0, 30]) {
-      out.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
-    }
+    out.push(`${String(h).padStart(2, "0")}:00`);
   }
   return out;
+}
+
+/** @deprecated Preferí hourSlots(); se mantiene por compatibilidad. */
+export function halfHourSlots(): string[] {
+  return hourSlots();
 }

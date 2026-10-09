@@ -4,7 +4,6 @@ import type { EquipoListItem } from "../../lib/equipos";
 import { Button, Card, EmptyState, Heading, Kicker, Lead, Mute, Screen } from "../../ui";
 import { typeStyle } from "../../ui/textStyle";
 
-const fondoAzul2 = require("../../../assets/fondo-azul-2.jpeg");
 
 type Props = {
   items: EquipoListItem[];
@@ -17,7 +16,7 @@ type Props = {
 
 export function EquiposListScreen({ items, loading, inboxCount, onCreate, onInbox, onOpen }: Props) {
   return (
-    <Screen scroll background={fondoAzul2} tabBar>
+    <Screen scroll tabBar>
       <Kicker>Equipos</Kicker>
       <Heading>Mis equipos</Heading>
       <Lead>

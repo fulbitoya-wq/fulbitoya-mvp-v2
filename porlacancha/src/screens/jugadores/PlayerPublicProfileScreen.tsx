@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, PLAYER_RANKS, space } from "@shared/design";
 import { mensajeErrorEquipo, rpcInvitarJugador } from "@shared/equipos";
@@ -15,8 +15,7 @@ import {
   desbloquearUsuario,
   estaBloqueado,
   reportarUsuario,
-  type MotivoReporte,
-} from "../../lib/moderacion";
+  type MotivoReporte } from "../../lib/moderacion";
 import { setPendingAction } from "../../lib/pending-action";
 import { supabase } from "../../lib/supabase";
 import { Button, Card, IconBtn, Mute, showConfirm, showNotice } from "../../ui";
@@ -30,7 +29,6 @@ import { fontFamily } from "../../lib/fonts";
 import { InviteTeamSheet } from "./InviteTeamSheet";
 import { ReportBlockSheet } from "./ReportBlockSheet";
 
-const fondoAzul = require("../../../assets/fondo-azul.jpeg");
 
 type Props = {
   player: SearchPlayer;
@@ -51,8 +49,7 @@ export function PlayerPublicProfileScreen({
   onBack,
   onCreateTeam,
   onRequestAuth,
-  onBlocked,
-}: Props) {
+  onBlocked }: Props) {
   const insets = useSafeAreaInsets();
   const rank = PLAYER_RANKS[player.range];
   const isNew = player.range === "new";
@@ -121,8 +118,7 @@ export function PlayerPublicProfileScreen({
         body: "Tenés que ser capitán de un equipo para invitar.",
         cancelLabel: "Cancelar",
         confirmLabel: "Crear equipo",
-        onConfirm: onCreateTeam,
-      });
+        onConfirm: onCreateTeam });
       return;
     }
     if (captainTeams.length === 1) {
@@ -179,8 +175,7 @@ export function PlayerPublicProfileScreen({
           setModeration(false);
           onBlocked?.();
         });
-      },
-    });
+      } });
   };
 
   const onUnblock = () => {
@@ -199,7 +194,7 @@ export function PlayerPublicProfileScreen({
   const positions = [player.primaryPosition, ...player.secondaryPositions].filter(Boolean);
 
   return (
-    <ImageBackground source={fondoAzul} style={styles.fill} resizeMode="cover">
+    <View style={[styles.fill, { backgroundColor: colors.navy }]}>
       <View style={[styles.bar, { paddingTop: Math.max(insets.top, space[8]) }]}>
         <IconBtn onPress={onBack} label="Volver">
           <ChevronLeft color={colors.gold} size={22} strokeWidth={iconStroke} />
@@ -336,7 +331,7 @@ export function PlayerPublicProfileScreen({
         onBlock={onBlock}
         onUnblock={onUnblock}
       />
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -352,8 +347,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.numBold,
     fontSize: 48,
     lineHeight: 50,
-    textAlign: "center",
-  },
+    textAlign: "center" },
   newHint: { ...typeStyle("caption", colors.sky), textAlign: "center" },
   playHow: { ...typeStyle("bodySmall", colors.goldLight), textAlign: "center" },
   name: { ...typeStyle("h2", colors.white), textAlign: "center" },
@@ -370,8 +364,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     justifyContent: "space-between",
     marginTop: space[24],
-    marginBottom: space[12],
-  },
+    marginBottom: space[12] },
   teamsN: typeStyle("bodySmall", colors.sky),
   teams: { gap: space[12], paddingRight: space[16] },
   bottom: {
@@ -380,8 +373,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,27,68,0.72)",
     paddingHorizontal: space[16],
     paddingTop: space[12],
-    gap: space[8],
-  },
+    gap: space[8] },
   actions: { flexDirection: "row", alignItems: "center", gap: space[8] },
   shareBtn: {
     width: 48,
@@ -390,6 +382,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
-  },
-});
+    flexShrink: 0 } });

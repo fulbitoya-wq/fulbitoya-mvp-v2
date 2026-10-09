@@ -12,6 +12,7 @@ import {
   inscribirEquipo,
   type InscripcionMia,
 } from "../lib/inscripciones";
+import { montoAPagar, pesos } from "../lib/plc";
 import { ChevronLeft, iconStroke } from "../lib/icons";
 import { Button, EmptyState, IconBtn, Mute, showConfirm, showNotice } from "../ui";
 import { typeStyle } from "../ui/textStyle";
@@ -107,22 +108,36 @@ export function InscribirEquipoScreen({ desafio, captainTeams, existing, onBack,
 
   const cancelar = () => {
     if (!existing) return;
-    showConfirm({
-      title: "Cancelar inscripción",
-      body: "El lugar queda libre. Los convocados se enteran por el aviso.",
-      cancelLabel: "Volver",
-      confirmLabel: "Cancelar inscripción",
-      danger: true,
-      onConfirm: () => {
-        void cancelarInscripcion(existing.id).then((res) => {
-          if (!res.ok) {
-            showNotice("No se pudo cancelar", res.error);
-            return;
-          }
-          onDone();
-        });
-      },
-    });
+    void (async () => {
+      let body = "El lugar queda libre. Los convocados se enteran por el aviso.";
+      if (porLaCancha && existing.estado === "confirmada") {
+        const m = await montoAPagar(existing.id);
+        if (m.ok && m.montoCancha > 0) {
+          body =
+            `Pagaste ${pesos(m.montoTotal)} (cancha ${pesos(m.montoCancha)}` +
+            (m.montoServicio > 0 ? ` + tarifa app ${pesos(m.montoServicio)}` : "") +
+            `).\n\nSe retiene la tarifa de uso de la app (${pesos(m.montoServicio)}).\n` +
+            `Te devolvemos ${pesos(m.montoCancha)} (la cancha).`;
+        }
+      }
+      showConfirm({
+        title: "Cancelar inscripción",
+        body,
+        cancelLabel: "Volver",
+        confirmLabel: "Cancelar inscripción",
+        danger: true,
+        onConfirm: () => {
+          void cancelarInscripcion(existing.id).then((res) => {
+            if (!res.ok) {
+              showNotice("No se pudo cancelar", res.error);
+              return;
+            }
+            showNotice("Inscripción cancelada", "Si correspondía, el reembolso de la cancha quedó registrado.");
+            onDone();
+          });
+        },
+      });
+    })();
   };
 
   if (captainTeams.length === 0) {

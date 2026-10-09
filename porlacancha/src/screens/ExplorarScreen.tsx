@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, radius, space } from "@shared/design";
 import { esFinde, esHoy, esManana, esSoloCancha, type Desafio } from "../lib/desafios";
@@ -8,7 +8,6 @@ import { fontFamily } from "../lib/fonts";
 import { typeStyle } from "../ui/textStyle";
 import { MapScreen } from "./MapScreen";
 
-const fondoAzul = require("../../assets/fondo-azul.jpeg");
 
 type WhenFilter = "todos" | "hoy" | "manana" | "finde";
 type TipoFilter = "todos" | "f5" | "f7" | "f9" | "f11";
@@ -36,8 +35,7 @@ export function ExplorarScreen({
   onSelectId,
   onOpenDesafio,
   unreadNotifs = 0,
-  onOpenNotifs,
-}: Props) {
+  onOpenNotifs }: Props) {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<"lista" | "mapa">(preferMap ? "mapa" : "lista");
 
@@ -165,10 +163,10 @@ export function ExplorarScreen({
     );
 
   return (
-    <ImageBackground source={fondoAzul} style={styles.fill} resizeMode="cover">
+    <View style={[styles.fill, { backgroundColor: colors.navy }]}>
       {header}
       {body}
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -178,14 +176,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[16],
     paddingBottom: space[12],
     gap: space[16],
-    minHeight: 118,
-  },
+    minHeight: 118 },
   brandRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    minHeight: 88,
-  },
+    minHeight: 88 },
   brandSide: { width: 48, minHeight: 48 },
   segment: {
     flexDirection: "row",
@@ -194,23 +190,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: space[4],
-    minHeight: 40,
-  },
+    minHeight: 40 },
   segBtn: {
     flex: 1,
     minHeight: 32,
     borderRadius: radius.pill,
     alignItems: "center",
-    justifyContent: "center",
-  },
+    justifyContent: "center" },
   segOn: { backgroundColor: "#2F7AAD" },
   segTxt: {
     ...typeStyle("caption", colors.white),
     fontFamily: fontFamily.uiBold,
-    fontWeight: "700",
-  },
+    fontWeight: "700" },
   segTxtOn: { color: colors.white, fontFamily: fontFamily.uiBold, fontWeight: "700" },
   filters: { flexDirection: "row", alignItems: "center", gap: space[8], paddingRight: space[8] },
   body: { flex: 1 },
-  list: { paddingHorizontal: space[16], paddingBottom: space[40], paddingTop: space[12], flexGrow: 1 },
-});
+  list: { paddingHorizontal: space[16], paddingBottom: space[40], paddingTop: space[12], flexGrow: 1 } });
