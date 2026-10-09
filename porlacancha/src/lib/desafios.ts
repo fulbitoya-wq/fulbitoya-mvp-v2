@@ -17,6 +17,8 @@ export type Desafio = {
   barrio: string | null;
   predio_nombre?: string | null;
   modalidad?: string | null;
+  precio_cancha?: number | null;
+  tarifa_servicio?: number | null;
   inscritos: { id: string; nombre: string; escudo_url: string | null }[];
   cupos: number;
   inscripcionId?: string | null;
@@ -50,7 +52,7 @@ export async function getDesafiosPublicos(): Promise<{
   const { data, error } = await supabase
     .from("desafios")
     .select(
-      "id, titulo, tipo, premio, direccion, barrio, lat, lng, fecha, hora_inicio, duracion_min, descripcion, estado, cancha_id, modalidad"
+      "id, titulo, tipo, premio, direccion, barrio, lat, lng, fecha, hora_inicio, duracion_min, descripcion, estado, cancha_id, modalidad, precio_cancha, tarifa_servicio"
     )
     .in("estado", ["abierto", "completo"])
     .gte("fecha", today)
@@ -221,7 +223,7 @@ export async function getDesafioPorId(id: string): Promise<Desafio | null> {
   const { data: row } = await supabase
     .from("desafios")
     .select(
-      "id, titulo, tipo, premio, direccion, barrio, lat, lng, fecha, hora_inicio, duracion_min, descripcion, estado, cancha_id, modalidad"
+      "id, titulo, tipo, premio, direccion, barrio, lat, lng, fecha, hora_inicio, duracion_min, descripcion, estado, cancha_id, modalidad, precio_cancha, tarifa_servicio"
     )
     .eq("id", id)
     .maybeSingle();

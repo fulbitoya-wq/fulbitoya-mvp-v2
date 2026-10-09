@@ -417,7 +417,7 @@ export function CrearPartidoScreen({
             [
               ["equipo", "Elegir equipo"],
               ["nuevo", "Crear equipo"],
-              ["sin_equipo", "Sin equipo"],
+              ...(modalidad === "por_la_cancha" ? [] : [["sin_equipo", "Sin equipo"] as const]),
             ] as const
           ).map(([k, label]) => (
             <Pressable
@@ -433,7 +433,11 @@ export function CrearPartidoScreen({
           captainTeams.length === 0 ? (
             <EmptyState
               title="Todavía no sos capitán"
-              body="Creá un equipo con un nombre o jugá sin equipo."
+              body={
+                modalidad === "por_la_cancha"
+                  ? "Para por la cancha necesitás un equipo. Creá uno con un nombre."
+                  : "Creá un equipo con un nombre o jugá sin equipo."
+              }
               action={<Button label="Crear equipo" onPress={() => setEquipoModo("nuevo")} />}
             />
           ) : (
@@ -458,21 +462,30 @@ export function CrearPartidoScreen({
             style={styles.input}
           />
         ) : null}
-        {equipoModo === "sin_equipo" ? (
+        {equipoModo === "sin_equipo" && modalidad !== "por_la_cancha" ? (
           <Mute>Jugás sin equipo. Podés sumar gente después; en cancha no adherida el partido es gratis.</Mute>
         ) : null}
 
         <Text style={[styles.h, { marginTop: space[16] }]}>Modalidad</Text>
         <View style={styles.rowWrap}>
           {(["amistoso", "competitivo", "por_la_cancha"] as const).map((m) => (
-            <Pressable key={m} onPress={() => setModalidad(m)} style={[styles.chip, modalidad === m && styles.chipOn]}>
+            <Pressable
+              key={m}
+              onPress={() => {
+                setModalidad(m);
+                if (m === "por_la_cancha" && equipoModo === "sin_equipo") {
+                  setEquipoModo(captainTeams.length ? "equipo" : "nuevo");
+                }
+              }}
+              style={[styles.chip, modalidad === m && styles.chipOn]}
+            >
               <Text style={styles.chipT}>{etiquetaModalidadPlc(m)}</Text>
             </Pressable>
           ))}
         </View>
         <Mute>
           {modalidad === "por_la_cancha"
-            ? "Cada lado paga la cancha de anticipado más la tarifa. Si ganan, el depósito de la cancha se le reembolsa al capitán."
+            ? "Cada lado paga la cancha de anticipado más la tarifa. Necesitás un equipo. Si ganan, el depósito se le reembolsa al capitán."
             : origen === "places" && !placeAdherido
               ? "Gratis en la app. Los que se suman pagan en el lugar. Etiqueta: Cancha no adherida."
               : "Partido abierto. En predio adherido puede haber tarifa Plus según el turno."}

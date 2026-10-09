@@ -34,6 +34,7 @@ import { CompleteUsernameScreen } from "./auth/CompleteUsernameScreen";
 import { ExplorarScreen } from "./ExplorarScreen";
 import { DesafioDetalleScreen } from "./DesafioDetalleScreen";
 import { InscribirEquipoScreen } from "./InscribirEquipoScreen";
+import { InscribirPagarModal } from "./InscribirPagarModal";
 import { MisPartidosScreen } from "./MisPartidosScreen";
 import { NotificacionesScreen } from "./NotificacionesScreen";
 import { PlusActionsSheet } from "./PlusActionsSheet";
@@ -109,6 +110,10 @@ export function MainTabs({ onRequestAuth }: Props) {
     acepto?: boolean;
   } | null>(null);
   const [inscribir, setInscribir] = useState<{ desafio: Desafio; existing: InscripcionMia | null } | null>(null);
+  const [inscribirPagar, setInscribirPagar] = useState<{
+    desafio: Desafio;
+    existingId?: string | null;
+  } | null>(null);
   const [mia, setMia] = useState<InscripcionMia | null>(null);
   const resumedKey = useRef<string | null>(null);
 
@@ -214,6 +219,10 @@ export function MainTabs({ onRequestAuth }: Props) {
       caps.map((e) => e.id),
       profile?.id
     );
+    if (d.modalidad === "por_la_cancha" && (!existing || existing.estado === "pendiente_pago")) {
+      setInscribirPagar({ desafio: d, existingId: existing?.id ?? null });
+      return;
+    }
     setInscribir({ desafio: d, existing });
   };
 
@@ -914,6 +923,29 @@ export function MainTabs({ onRequestAuth }: Props) {
         onClose={() => setJoinOpen(false)}
         onJoined={() => void refreshTeams()}
       />
+      {inscribirPagar ? (
+        <InscribirPagarModal
+          visible
+          desafio={inscribirPagar.desafio}
+          captainTeams={equiposDondeEsCapitan(equipos)}
+          existingInscripcionId={inscribirPagar.existingId}
+          onClose={() => setInscribirPagar(null)}
+          onTeamsChanged={() => void refreshTeams()}
+          onDone={() => {
+            const id = inscribirPagar.desafio.id;
+            setInscribirPagar(null);
+            void refreshNotifs();
+            void refreshTeams();
+            void refreshDesafios().then((list) => {
+              const d = list.find((x) => x.id === id);
+              if (d) {
+                setDetalle(d);
+                setSelectedId(d.id);
+              }
+            });
+          }}
+        />
+      ) : null}
     </View>
   );
 }

@@ -99,6 +99,11 @@ export function DesafioDetalleScreen({
   }, [desafio.id, inscripcionId, estadoInscripcion, profile?.id]);
 
   const cupoLleno = (desafio.inscritos?.length ?? 0) >= (desafio.cupos || 2);
+  const rivalNombre =
+    desafio.inscritos?.find((e) => e.nombre)?.nombre?.trim() ||
+    desafio.titulo.replace(/^Por la cancha en /i, "").trim() ||
+    null;
+  const totalPlc = Number(desafio.precio_cancha ?? 0) + Number(desafio.tarifa_servicio ?? 0);
   const inscribir = () => {
     onInscribir();
   };
@@ -106,7 +111,9 @@ export function DesafioDetalleScreen({
     ? "Ingresá para inscribir"
     : estadoInscripcion === "pendiente_pago"
       ? porLaCancha
-        ? "Pagar cancha de anticipado"
+        ? totalPlc > 0
+          ? `Pagar ${pesos(totalPlc)}`
+          : "Pagar"
         : "Pagar seña de prueba"
       : inscriptoComo === "capitan"
         ? "Editar convocados"
@@ -114,9 +121,13 @@ export function DesafioDetalleScreen({
           ? "Tu equipo ya está"
           : cupoLleno && !amistoso
             ? "Sin lugar"
-            : amistoso && !inscriptoComo
-              ? "Inscribir equipo o anotarme"
-              : "Inscribir mi equipo";
+            : porLaCancha
+              ? rivalNombre
+                ? `Jugarle a ${rivalNombre}`
+                : "Jugarle"
+              : amistoso && !inscriptoComo
+                ? "Inscribir equipo o anotarme"
+                : "Inscribir mi equipo";
   const ctaOff = Boolean(
     !guest &&
       estadoInscripcion !== "pendiente_pago" &&
@@ -206,18 +217,15 @@ export function DesafioDetalleScreen({
   const stickyLabel =
     estadoInscripcion === "pendiente_pago" && pago
       ? pesos(pago.total)
-      : solo
-        ? etiquetaModalidad(Number(desafio.premio), desafio.modalidad)
-        : formatPremio(Number(desafio.premio));
+      : porLaCancha && !inscriptoComo && totalPlc > 0
+        ? pesos(totalPlc)
+        : solo
+          ? etiquetaModalidad(Number(desafio.premio), desafio.modalidad)
+          : formatPremio(Number(desafio.premio));
 
   return (
     <View style={styles.page}>
-      <ScrollView
-        contentContainerStyle={{
-          paddingBottom: porLaCancha && estadoInscripcion === "pendiente_pago" ? 220 : 140,
-        }}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
         <View>
           <PitchCover height={220} variant="flush">
             <View style={[styles.heroNav, { paddingTop: Math.max(insets.top, space[12]) }]}>
@@ -350,8 +358,8 @@ export function DesafioDetalleScreen({
                 : "Cada equipo paga lo que calcula el predio según la modalidad."}
           </Mute>
           <Mute>
-            {porLaCancha && estadoInscripcion === "pendiente_pago"
-              ? "Tu equipo ya está anotado. Podés completar el plantel y pagar la cancha de anticipado cuando estés listo (antes del cierre). En modo prueba no se abre Mercado Pago."
+            {porLaCancha
+              ? "En este entorno el pago es de prueba: elegís tu equipo, ves el total y pagás en un solo paso (sin Mercado Pago real)."
               : "En este entorno el pago es de prueba: no pasa por Mercado Pago real."}
           </Mute>
           {copyVisible ? <Text style={styles.body}>{copyVisible}</Text> : null}
@@ -364,51 +372,33 @@ export function DesafioDetalleScreen({
         </View>
       </ScrollView>
 
-      <View
-        style={[
-          styles.sticky,
-          porLaCancha && estadoInscripcion === "pendiente_pago" ? styles.stickyCol : null,
-          { paddingBottom: insets.bottom + space[12] },
-        ]}
-      >
-        <View style={porLaCancha && estadoInscripcion === "pendiente_pago" ? undefined : { flexShrink: 0 }}>
+      <View style={[styles.sticky, { paddingBottom: insets.bottom + space[12] }]}>
+        <View style={{ flexShrink: 0 }}>
           <Text style={styles.ctaKicker}>
-            {estadoInscripcion === "pendiente_pago"
-              ? porLaCancha
-                ? "Cancha de anticipado"
-                : "A pagar"
-              : solo
-                ? "Modalidad"
-                : "Premio"}
+            {porLaCancha && (!inscriptoComo || estadoInscripcion === "pendiente_pago")
+              ? "Tu parte"
+              : estadoInscripcion === "pendiente_pago"
+                ? "A pagar"
+                : solo
+                  ? "Modalidad"
+                  : "Premio"}
           </Text>
           <Text style={styles.ctaPrize}>{stickyLabel}</Text>
         </View>
-        {porLaCancha && estadoInscripcion === "pendiente_pago" ? (
-          <View style={{ gap: space[8], width: "100%" }}>
-            <Button
-              label={busy ? "Confirmando..." : "Pagar cancha de anticipado"}
-              onPress={() => void pagar()}
-              disabled={busy}
-              loading={busy}
-            />
-            <Button label="Completar plantel" variant="secondary" onPress={inscribir} disabled={busy} />
-          </View>
-        ) : (
-          <View style={{ flex: 1 }}>
-            <Button
-              label={busy && estadoInscripcion === "pendiente_pago" ? "Confirmando..." : ctaLabel}
-              onPress={() => {
-                if (estadoInscripcion === "pendiente_pago") {
-                  void pagar();
-                  return;
-                }
-                inscribir();
-              }}
-              disabled={ctaOff || busy}
-              loading={busy && estadoInscripcion === "pendiente_pago"}
-            />
-          </View>
-        )}
+        <View style={{ flex: 1 }}>
+          <Button
+            label={ctaLabel}
+            onPress={() => {
+              if (estadoInscripcion === "pendiente_pago" && !porLaCancha) {
+                void pagar();
+                return;
+              }
+              inscribir();
+            }}
+            disabled={ctaOff || busy}
+            loading={busy && estadoInscripcion === "pendiente_pago" && !porLaCancha}
+          />
+        </View>
       </View>
     </View>
   );
@@ -485,10 +475,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: space[12],
-  },
-  stickyCol: {
-    flexDirection: "column",
-    alignItems: "stretch",
   },
   ctaKicker: typeStyle("caption", colors.textSecondary),
   ctaPrize: typeStyle("numM", colors.gold),
