@@ -304,7 +304,7 @@ export function ReservarCanchaScreen({
           </Pressable>
         </View>
 
-        <Text style={styles.h}>Nuestras canchas</Text>
+        <Text style={styles.h}>Canchas sugeridas para ti</Text>
         {loading || !bootLocDone ? <Mute>Cargando canchas…</Mute> : null}
         {error ? <Mute>{error}</Mute> : null}
 
