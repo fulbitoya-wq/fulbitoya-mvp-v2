@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -25,6 +25,7 @@ import {
 } from "../lib/desafios";
 import {
   cancelarInscripcion,
+  guardarConvocados,
   listarConvocadosPlantel,
   type ConvocadoPlantel,
 } from "../lib/inscripciones";
@@ -34,12 +35,13 @@ import {
   montoAPagar,
   pesos,
 } from "../lib/plc";
+import type { SearchPlayer } from "../lib/player-search";
 import { getEquipoDetalle } from "../lib/equipos";
 import { ChevronLeft, MapPin, Share2, iconStroke } from "../lib/icons";
 import { compartirTexto } from "../lib/share-text";
 import { supabase } from "../lib/supabase";
 import { webBaseUrl } from "../lib/web-url";
-import { Button, Chip, Mute, showConfirm, showNotice } from "../ui";
+import { Button, Chip, Mute, SumarJugadorModal, showConfirm, showNotice } from "../ui";
 import { CanchaMap } from "../ui/maps/CanchaMap";
 import { EquipoCupos } from "../ui/EquipoCupos";
 import { PlantelPitch } from "../ui/PlantelPitch";
@@ -90,7 +92,7 @@ export function DesafioDetalleScreen({
   const [pago, setPago] = useState<{ total: number; cancha: number; servicio: number } | null>(null);
   const [plantel, setPlantel] = useState<ConvocadoPlantel[]>([]);
   const [equipoId, setEquipoId] = useState<string | null>(null);
-  const [invitadoNombre, setInvitadoNombre] = useState("");
+  const [slotModal, setSlotModal] = useState<{ pos: string } | null>(null);
   const [invitando, setInvitando] = useState(false);
   const [busy, setBusy] = useState(false);
   const [needIdentidad, setNeedIdentidad] = useState(false);
@@ -107,14 +109,15 @@ export function DesafioDetalleScreen({
       setPago(null);
     }
     if (inscripcionId && (esCapitan || inscriptoComo === "miembro")) {
-      const list = await listarConvocadosPlantel(inscripcionId);
-      setPlantel(list);
       const { data: insc } = await supabase
         .from("desafio_inscripciones")
         .select("equipo_id")
         .eq("id", inscripcionId)
         .maybeSingle();
-      setEquipoId(insc?.equipo_id ? String(insc.equipo_id) : null);
+      const eqId = insc?.equipo_id ? String(insc.equipo_id) : null;
+      setEquipoId(eqId);
+      const list = await listarConvocadosPlantel(inscripcionId, eqId);
+      setPlantel(list);
     } else {
       setPlantel([]);
       setEquipoId(null);
@@ -149,7 +152,7 @@ export function DesafioDetalleScreen({
       : estadoInscripcion === "pendiente_pago" && !porLaCancha
         ? "Ver partido"
         : inscriptoComo === "capitan"
-          ? "Armar equipo"
+          ? "Compartir partido"
           : inscriptoComo === "miembro"
             ? "Tu equipo ya está"
             : cupoLleno && !amistoso
@@ -204,8 +207,8 @@ export function DesafioDetalleScreen({
     }
   };
 
-  const agregarInvitado = async () => {
-    const nombre = invitadoNombre.trim();
+  const agregarInvitado = async (nombreRaw: string) => {
+    const nombre = nombreRaw.trim();
     if (!nombre) {
       showNotice("Invitado", "Poné solo el nombre.");
       return;
@@ -221,8 +224,37 @@ export function DesafioDetalleScreen({
         showNotice("No se pudo agregar", res.error);
         return;
       }
-      setInvitadoNombre("");
-      showNotice("Listo", `${nombre} quedó en el plantel. Sumalo a la cancha con Armar equipo.`);
+      setSlotModal(null);
+      showNotice("Listo", `${nombre} quedó en tu cancha como invitado.`);
+      void load();
+    } finally {
+      setInvitando(false);
+    }
+  };
+
+  const agregarJugadorPlataforma = async (player: SearchPlayer) => {
+    if (!inscripcionId) {
+      showNotice("Equipo", "Primero inscribí el equipo.");
+      return;
+    }
+    const actuales = plantel.map((p) => p.usuarioId).filter((id): id is string => Boolean(id));
+    if (actuales.includes(player.id)) {
+      showNotice("Plantel", "Ese jugador ya está en la cancha.");
+      return;
+    }
+    if (plantel.length >= minPlantel) {
+      showNotice("Plantel", `Ya tenés los ${minPlantel} puestos del formato.`);
+      return;
+    }
+    setInvitando(true);
+    try {
+      const res = await guardarConvocados(inscripcionId, [...actuales, player.id]);
+      if (!res.ok) {
+        showNotice("No se pudo sumar", res.error);
+        return;
+      }
+      setSlotModal(null);
+      showNotice("Listo", `${player.name} quedó en la cancha.`);
       void load();
     } finally {
       setInvitando(false);
@@ -410,18 +442,30 @@ export function DesafioDetalleScreen({
               <Text style={styles.h2}>Tu cancha</Text>
               <Mute>
                 {esCapitan
-                  ? `Armá el ${etiquetaTipo(desafio.tipo)}: arquero y jugadores. Compartí el link para que se sumen.`
+                  ? `Tocá un puesto libre del ${etiquetaTipo(desafio.tipo)} para sumar invitado o un jugador de la zona.`
                   : "Así queda el plantel en cancha."}
               </Mute>
               <PlantelPitch
                 tipo={desafio.tipo}
-                filled={plantel.map((p) => ({ id: p.usuarioId, label: p.label }))}
-                onPressEmpty={esCapitan ? () => onInscribir() : undefined}
-                onPressFilled={esCapitan ? () => onInscribir() : undefined}
+                filled={plantel.map((p) => ({
+                  id: p.usuarioId ?? p.miembroId ?? p.label,
+                  label: p.label,
+                }))}
+                onPressEmpty={
+                  esCapitan
+                    ? (slot) => {
+                        if (!equipoId) {
+                          showNotice("Equipo", "Primero inscribí el equipo del partido.");
+                          onInscribir();
+                          return;
+                        }
+                        setSlotModal({ pos: slot.pos });
+                      }
+                    : undefined
+                }
               />
               {esCapitan ? (
                 <View style={{ gap: space[8], marginTop: space[12] }}>
-                  <Button label="Armar equipo" onPress={() => onInscribir()} />
                   <Button
                     label="Compartir link del partido"
                     variant="secondary"
@@ -436,23 +480,9 @@ export function DesafioDetalleScreen({
                       loading={busy}
                     />
                   ) : null}
-                  <TextInput
-                    value={invitadoNombre}
-                    onChangeText={setInvitadoNombre}
-                    placeholder="Invitado (solo nombre)"
-                    placeholderTextColor={colors.textSecondary}
-                    style={styles.input}
-                  />
-                  <Button
-                    label={invitando ? "Agregando..." : "Agregar invitado"}
-                    variant="ghost"
-                    onPress={() => void agregarInvitado()}
-                    disabled={invitando || !equipoId}
-                    loading={invitando}
-                  />
                   <Mute>
                     {plantel.length < minPlantel
-                      ? `Llevás ${plantel.length} de ${minPlantel}. Con el capitán alcanza para publicar; completá antes del partido.`
+                      ? `Llevás ${plantel.length} de ${minPlantel}. Tocá un puesto libre para completar.`
                       : "Plantel completo para el formato."}
                   </Mute>
                 </View>
@@ -524,6 +554,10 @@ export function DesafioDetalleScreen({
               if (estadoInscripcion === "pendiente_pago" && !porLaCancha && !featureFlags.reserva_plus_habilitada) {
                 return;
               }
+              if (esCapitan && !mostrarPago) {
+                compartir();
+                return;
+              }
               inscribir();
             }}
             disabled={ctaOff || busy}
@@ -531,6 +565,17 @@ export function DesafioDetalleScreen({
           />
         </View>
       </View>
+
+      <SumarJugadorModal
+        visible={Boolean(slotModal)}
+        posLabel={slotModal?.pos ?? "Libre"}
+        zonaHint={desafio.barrio || desafio.direccion}
+        excludeUserIds={plantel.map((p) => p.usuarioId).filter((id): id is string => Boolean(id))}
+        busy={invitando}
+        onClose={() => setSlotModal(null)}
+        onAddGuest={(nombre) => void agregarInvitado(nombre)}
+        onAddPlayer={(p) => void agregarJugadorPlataforma(p)}
+      />
     </View>
   );
 }
@@ -609,15 +654,4 @@ const styles = StyleSheet.create({
   },
   ctaKicker: typeStyle("caption", colors.textSecondary),
   ctaPrize: typeStyle("numM", colors.gold),
-  input: {
-    marginTop: space[4],
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: "rgba(139,201,235,0.35)",
-    borderRadius: radius.md,
-    paddingHorizontal: space[12],
-    color: colors.white,
-    backgroundColor: colors.surface,
-    ...typeStyle("body", colors.white),
-  },
 });
