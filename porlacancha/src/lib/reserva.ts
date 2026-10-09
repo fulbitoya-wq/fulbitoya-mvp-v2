@@ -12,6 +12,7 @@ import {
   rpcGuardarListaReserva,
   rpcIniciarCheckoutEnlace,
   rpcIniciarCheckoutReserva,
+  rpcReservarTurnoGratis,
   rpcListarListaReserva,
   rpcListarMisReservasPlc,
   rpcListarPrediosPublicos,
@@ -347,6 +348,16 @@ async function seguirAMercadoPago(holdId: string, initPoint: string): Promise<Pa
     await Linking.openURL(initPoint);
   }
   return { ok: true, canal: "app" };
+}
+
+/** Beta: sin seña del predio → reserva gratis (se paga en el lugar). */
+export async function reservarTurnoGratis(
+  turnoId: string
+): Promise<{ ok: true; reservaId: string } | { ok: false; error: string }> {
+  const res = await rpcReservarTurnoGratis(supabase, turnoId, true);
+  if (!res.ok) return { ok: false, error: err(res.error) };
+  if (!res.reserva_id) return { ok: false, error: "No se pudo reservar el turno." };
+  return { ok: true, reservaId: res.reserva_id };
 }
 
 export async function pagarReserva(

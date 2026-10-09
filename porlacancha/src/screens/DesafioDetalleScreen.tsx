@@ -2,7 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { esErrorIdentidadDesafio } from "@shared/equipos";
-import { colors, radius, space } from "@shared/design";
+import { colors, featureFlags, radius, space } from "@shared/design";
 import { useAuth } from "../auth/AuthProvider";
 import {
   etiquetaEmpiezaEn,
@@ -110,29 +110,36 @@ export function DesafioDetalleScreen({
   const inscribir = () => {
     onInscribir();
   };
+  // Beta: solo por la cancha cobra. Amistoso/competitivo/Plus no muestran pagar.
+  const mostrarPago =
+    estadoInscripcion === "pendiente_pago" &&
+    (porLaCancha || featureFlags.reserva_plus_habilitada);
   const ctaLabel = guest
     ? "Ingresá para inscribir"
-    : estadoInscripcion === "pendiente_pago"
+    : mostrarPago
       ? porLaCancha
         ? totalPlc > 0
           ? `Pagar ${pesos(totalPlc)}`
           : "Pagar"
         : "Pagar seña de prueba"
-      : inscriptoComo === "capitan"
-        ? "Editar convocados"
-        : inscriptoComo === "miembro"
-          ? "Tu equipo ya está"
-          : cupoLleno && !amistoso
-            ? "Sin lugar"
-            : porLaCancha
-              ? rivalNombre
-                ? `Jugarle a ${rivalNombre}`
-                : "Jugarle"
-              : amistoso && !inscriptoComo
-                ? "Inscribir equipo o anotarme"
-                : "Inscribir mi equipo";
+      : estadoInscripcion === "pendiente_pago" && !porLaCancha
+        ? "Ver partido"
+        : inscriptoComo === "capitan"
+          ? "Editar convocados"
+          : inscriptoComo === "miembro"
+            ? "Tu equipo ya está"
+            : cupoLleno && !amistoso
+              ? "Sin lugar"
+              : porLaCancha
+                ? rivalNombre
+                  ? `Jugarle a ${rivalNombre}`
+                  : "Jugarle"
+                : amistoso && !inscriptoComo
+                  ? "Inscribir equipo o anotarme"
+                  : "Inscribir mi equipo";
   const ctaOff = Boolean(
     !guest &&
+      !mostrarPago &&
       estadoInscripcion !== "pendiente_pago" &&
       (inscriptoComo === "miembro" || (!inscriptoComo && cupoLleno && !amistoso))
   );
@@ -254,7 +261,7 @@ export function DesafioDetalleScreen({
   };
 
   const stickyLabel =
-    estadoInscripcion === "pendiente_pago" && pago
+    mostrarPago && pago
       ? pesos(pago.total)
       : porLaCancha && !inscriptoComo && totalPlc > 0
         ? pesos(totalPlc)
@@ -390,17 +397,18 @@ export function DesafioDetalleScreen({
 
           <Text style={styles.h2}>¿Cómo funciona?</Text>
           <Mute>
-            {amistoso
-              ? "Amistoso: el equipo que publica paga la cancha. Si se completa el rival, se devuelve la mitad. Podés sumarte suelto."
-              : porLaCancha
-                ? "Por la cancha: cada equipo paga la cancha de anticipado (más la tarifa). Si ganan, el depósito de la cancha se le reembolsa al capitán."
-                : "Cada equipo paga lo que calcula el predio según la modalidad."}
-          </Mute>
-          <Mute>
             {porLaCancha
-              ? "En este entorno el pago es de prueba: elegís tu equipo, ves el total y pagás en un solo paso (sin Mercado Pago real)."
-              : "En este entorno el pago es de prueba: no pasa por Mercado Pago real."}
+              ? "Por la cancha: cada equipo paga la cancha de anticipado más la tarifa de la app. Si ganan, el depósito de la cancha se le reembolsa al capitán."
+              : amistoso
+                ? "Amistoso: gratis en la app. Sumate con equipo o suelto. La cancha se arregla aparte."
+                : "Competitivo: gratis en la app. Inscribí tu equipo y jugá."}
           </Mute>
+          {porLaCancha ? (
+            <Mute>
+              En este entorno el pago es de prueba: elegís tu equipo, ves el total y pagás en un solo paso (sin Mercado
+              Pago real).
+            </Mute>
+          ) : null}
           {copyVisible ? <Text style={styles.body}>{copyVisible}</Text> : null}
 
           {amistoso && !guest && !inscriptoComo ? (
@@ -429,10 +437,10 @@ export function DesafioDetalleScreen({
       <View style={[styles.sticky, { paddingBottom: insets.bottom + space[12] }]}>
         <View style={{ flexShrink: 0 }}>
           <Text style={styles.ctaKicker}>
-            {porLaCancha && (!inscriptoComo || estadoInscripcion === "pendiente_pago")
-              ? "Tu parte"
-              : estadoInscripcion === "pendiente_pago"
-                ? "A pagar"
+            {mostrarPago
+              ? "A pagar"
+              : porLaCancha && !inscriptoComo
+                ? "Tu parte"
                 : solo
                   ? "Modalidad"
                   : "Premio"}
@@ -443,14 +451,18 @@ export function DesafioDetalleScreen({
           <Button
             label={ctaLabel}
             onPress={() => {
-              if (estadoInscripcion === "pendiente_pago" && !porLaCancha) {
+              if (mostrarPago && !porLaCancha) {
                 void pagar();
+                return;
+              }
+              // pendiente_pago de modalidades gratis: no cobrar, solo navegar/inscribir
+              if (estadoInscripcion === "pendiente_pago" && !porLaCancha && !featureFlags.reserva_plus_habilitada) {
                 return;
               }
               inscribir();
             }}
             disabled={ctaOff || busy}
-            loading={busy && estadoInscripcion === "pendiente_pago" && !porLaCancha}
+            loading={busy && mostrarPago && !porLaCancha}
           />
         </View>
       </View>

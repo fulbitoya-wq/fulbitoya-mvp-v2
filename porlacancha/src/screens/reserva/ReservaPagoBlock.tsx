@@ -1,5 +1,5 @@
 import { Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { colors, radius, space } from "@shared/design";
+import { colors, featureFlags, radius, space } from "@shared/design";
 import { etiquetaTipo, formatFechaCorta, formatHora } from "../../lib/desafios";
 import { Check, iconStroke } from "../../lib/icons";
 import {
@@ -77,6 +77,7 @@ export function ReservaPagoBlock({ opciones, tipo, acepto, onSelectTipo, onToggl
   const stacked = width < 380;
   const sena = opciones.opcion_sena;
   const total = opciones.opcion_total;
+  const showTotal = featureFlags.reserva_pago_total_habilitado;
   const reglasUrl = reglasPredioUrl(opciones.slug);
 
   const selectedOpt = tipo === "sena" ? sena : tipo === "total" ? total : null;
@@ -84,10 +85,10 @@ export function ReservaPagoBlock({ opciones, tipo, acepto, onSelectTipo, onToggl
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.h}>¿Cómo querés reservar?</Text>
+      <Text style={styles.h}>{showTotal ? "¿Cómo querés reservar?" : "Seña del predio"}</Text>
       <View style={[styles.row, stacked && styles.col]}>
         <PayCard
-          stacked={stacked}
+          stacked={stacked || !showTotal}
           title="Seña"
           primary={sena.disponible && sena.monto_pagar != null ? `Pagás ${pesosReserva(sena.monto_pagar)} ahora` : "No disponible"}
           secondary={
@@ -100,27 +101,33 @@ export function ReservaPagoBlock({ opciones, tipo, acepto, onSelectTipo, onToggl
           aclaracion={sena.aclaracion}
           onPress={() => onSelectTipo("sena")}
         />
-        <PayCard
-          stacked={stacked}
-          title="Pago total"
-          primary={
-            total.disponible && total.monto_pagar != null
-              ? `Pagás ${pesosReserva(total.monto_pagar)} ahora`
-              : "No disponible"
-          }
-          secondary={total.disponible ? "Todo pago" : "—"}
-          highlight={
-            total.disponible && total.descuento > 0
-              ? `Ahorrás ${pesosReserva(total.descuento)} (${Math.round(total.descuento_pct)}%)`
-              : null
-          }
-          selected={tipo === "total"}
-          disabled={!total.disponible}
-          aclaracion={total.aclaracion}
-          onPress={() => onSelectTipo("total")}
-        />
+        {showTotal ? (
+          <PayCard
+            stacked={stacked}
+            title="Pago total"
+            primary={
+              total.disponible && total.monto_pagar != null
+                ? `Pagás ${pesosReserva(total.monto_pagar)} ahora`
+                : "No disponible"
+            }
+            secondary={total.disponible ? "Todo pago" : "—"}
+            highlight={
+              total.disponible && total.descuento > 0
+                ? `Ahorrás ${pesosReserva(total.descuento)} (${Math.round(total.descuento_pct)}%)`
+                : null
+            }
+            selected={tipo === "total"}
+            disabled={!total.disponible}
+            aclaracion={total.aclaracion}
+            onPress={() => onSelectTipo("total")}
+          />
+        ) : null}
       </View>
-      <Mute>La seña asegura el turno. El importe restante se paga según las condiciones del predio.</Mute>
+      <Mute>
+        {showTotal
+          ? "La seña asegura el turno. El importe restante se paga según las condiciones del predio."
+          : "Pagás la seña ahora. El resto, en el predio."}
+      </Mute>
 
       {tipo && selectedOpt?.disponible ? (
         <View style={styles.summary}>

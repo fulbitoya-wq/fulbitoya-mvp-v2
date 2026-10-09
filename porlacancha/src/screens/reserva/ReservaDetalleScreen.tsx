@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, radius, space } from "@shared/design";
+import { colors, featureFlags, radius, space } from "@shared/design";
 import { useAuth } from "../../auth/AuthProvider";
 import { formatFechaCorta, formatHora } from "../../lib/desafios";
 import { ChevronLeft, iconStroke } from "../../lib/icons";
@@ -202,7 +202,7 @@ export function ReservaDetalleScreen({
               loading={busy}
               disabled={busy}
             />
-            {reserva.canal !== "whatsapp" ? (
+            {featureFlags.reserva_plus_habilitada && reserva.canal !== "whatsapp" ? (
               <Button
                 label="Pasar a Plus"
                 onPress={() => onPasarAPlus(reserva.id)}

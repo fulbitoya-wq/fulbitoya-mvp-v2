@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { esErrorIdentidadDesafio } from "@shared/equipos";
-import { colors, radius, space } from "@shared/design";
+import { colors, featureFlags, radius, space } from "@shared/design";
 import { rpcInvitarSinCuenta } from "@shared/equipos";
 import type { EquipoListItem, MiembroPlantel } from "../lib/equipos";
 import { getEquipoDetalle } from "../lib/equipos";
@@ -113,6 +113,9 @@ export function CrearPartidoScreen({
   const invitados = useMemo(() => miembros.filter((m) => m.es_invitado), [miembros]);
   const esLibrePlaces =
     origen === "places" && !placeAdherido && (modalidad === "amistoso" || modalidad === "competitivo");
+  /** Beta: amistoso/competitivo siempre gratis (sin Plus). Por la cancha = depósito. */
+  const esPartidoGratis =
+    (modalidad === "amistoso" || modalidad === "competitivo") && !featureFlags.reserva_plus_habilitada;
   const esDeposito =
     modalidad === "por_la_cancha" &&
     ((origen === "fulbitoya" && !!turnoId) || (origen === "places" && !!placeCanchaId));
@@ -243,7 +246,8 @@ export function CrearPartidoScreen({
   }, [predioId, diasConLibres, diasAgenda, diaId]);
 
   useEffect(() => {
-    if (!turnoId || origen !== "fulbitoya" || modalidad === "por_la_cancha") {
+    // Beta: no cotizamos Plus / condiciones de pago para amistoso-competitivo.
+    if (!turnoId || origen !== "fulbitoya" || modalidad === "por_la_cancha" || esPartidoGratis) {
       setCond(null);
       setCondErr(null);
       return;
@@ -262,7 +266,7 @@ export function CrearPartidoScreen({
     return () => {
       cancelled = true;
     };
-  }, [turnoId, modalidad, origen]);
+  }, [turnoId, modalidad, origen, esPartidoGratis]);
 
   useEffect(() => {
     if (!esDeposito) {
@@ -383,26 +387,38 @@ export function CrearPartidoScreen({
   const publicar = async () => {
     setBusy(true);
     try {
-      if (esLibrePlaces) {
-        if (!placeCanchaId || !fecha || !hora) {
+      // Amistoso / competitivo: gratis en beta (también si eligió turno de la app).
+      if (esLibrePlaces || (esPartidoGratis && !esDeposito)) {
+        const canchaLibre =
+          origen === "places"
+            ? placeCanchaId
+            : turno?.cancha_id ?? predioId;
+        const fechaLibre = origen === "places" ? fecha : turno?.fecha ?? diaId;
+        const horaLibre =
+          origen === "places"
+            ? hora.length === 5
+              ? `${hora}:00`
+              : hora
+            : turno?.hora_inicio ?? "";
+        if (!canchaLibre || !fechaLibre || !horaLibre) {
           showNotice("Faltan datos", "Confirmá el lugar, el día y la hora.");
           return;
         }
         const eq = await asegurarEquipo();
         if (equipoModo !== "sin_equipo" && !eq) return;
         const res = await crearPartidoLibrePlc({
-          canchaId: placeCanchaId,
-          fecha,
-          horaInicio: hora.length === 5 ? `${hora}:00` : hora,
+          canchaId: canchaLibre,
+          fecha: fechaLibre,
+          horaInicio: horaLibre,
           formato,
-          precioCancha: Number(precioCancha) || 0,
+          precioCancha: Number(precioCancha) || turno?.precio || 0,
           modalidad: modalidad === "competitivo" ? "competitivo" : "amistoso",
           equipoId: eq,
           convocados: eq ? selected : undefined,
           reglaEmpate: regla,
-          superficie,
-          techada,
-          iluminacion,
+          superficie: origen === "places" ? superficie : null,
+          techada: origen === "places" ? techada : null,
+          iluminacion: origen === "places" ? iluminacion : null,
         });
         if (!res.ok) {
           showNotice("No se pudo publicar", res.error);
@@ -500,7 +516,11 @@ export function CrearPartidoScreen({
     (equipoModo === "equipo" && !!equipoId);
 
   const canPublishLibre =
-    esLibrePlaces && !!placeCanchaId && !!fecha && !!hora && equipoListo;
+    (esLibrePlaces || (esPartidoGratis && !esDeposito)) &&
+    equipoListo &&
+    (origen === "fulbitoya"
+      ? !!turnoId
+      : !!placeCanchaId && !!fecha && !!hora);
 
   // Alcanza con el capitán (u otro convocado con cuenta). Plantel completo = a la hora del partido.
   const canPublishDeposito =
@@ -512,8 +532,10 @@ export function CrearPartidoScreen({
     (selected.length >= 1 || equipoModo === "nuevo");
 
   const canPublishPlus =
+    featureFlags.reserva_plus_habilitada &&
     !esLibrePlaces &&
     !esDeposito &&
+    !esPartidoGratis &&
     !!turnoId &&
     equipoModo === "equipo" &&
     !!equipoId &&
@@ -822,7 +844,7 @@ export function CrearPartidoScreen({
             </Pressable>
           </View>
         ) : null}
-        {cond && cond.ok !== false && !esDeposito ? (
+        {cond && cond.ok !== false && !esDeposito && !esPartidoGratis ? (
           <View style={{ marginTop: space[12], gap: space[4] }}>
             <Mute>{typeof cond.mensaje_tramo === "string" ? cond.mensaje_tramo : ""}</Mute>
             <Mute>{`Cancha ${pesos(cond.precio_cancha)} · tu equipo ${pesos(cond.monto_equipo_a)}`}</Mute>
@@ -961,16 +983,20 @@ export function CrearPartidoScreen({
                 label={
                   busy
                     ? "Publicando..."
-                    : esLibrePlaces
-                      ? "Publicar partido gratis"
-                      : esDeposito
-                        ? "Publicar y pagar"
+                    : esDeposito
+                      ? "Publicar y pagar"
+                      : esLibrePlaces || esPartidoGratis
+                        ? "Publicar partido gratis"
                         : "Publicar y continuar al pago"
                 }
                 onPress={() => void publicar()}
                 disabled={
                   busy ||
-                  (esLibrePlaces ? !canPublishLibre : esDeposito ? !canPublishDeposito : !canPublishPlus)
+                  (esDeposito
+                    ? !canPublishDeposito
+                    : esLibrePlaces || esPartidoGratis
+                      ? !canPublishLibre
+                      : !canPublishPlus)
                 }
                 loading={busy}
               />

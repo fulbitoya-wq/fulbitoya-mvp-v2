@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { colors } from "@shared/design";
+import { colors, featureFlags } from "@shared/design";
 import { useAuth } from "../auth/AuthProvider";
 import { getDesafioPorId, getDesafiosPublicos, type Desafio } from "../lib/desafios";
 import { listInvitacionesRecibidas, listMisEquipos, equiposDondeEsCapitan, type EquipoListItem } from "../lib/equipos";
@@ -554,7 +554,7 @@ export function MainTabs({ onRequestAuth }: Props) {
               });
             }}
           />
-        ) : reservaPlus ? (
+        ) : reservaPlus && featureFlags.reserva_plus_habilitada ? (
           <ReservaPlusWizard
             captainTeams={equiposDondeEsCapitan(equipos)}
             initial={reservaPlus}
@@ -675,6 +675,7 @@ export function MainTabs({ onRequestAuth }: Props) {
             initial={reservaDetalle}
             onBack={() => setReservaDetalle(null)}
             onPasarAPlus={(reservaId) => {
+              if (!featureFlags.reserva_plus_habilitada) return;
               setReservaDetalle(null);
               void queueOrRun({ kind: "reserva_plus", fromReservaId: reservaId }, () =>
                 setReservaPlus({ kind: "plus", fromReservaId: reservaId })
@@ -774,13 +775,17 @@ export function MainTabs({ onRequestAuth }: Props) {
             }}
             onRequestAuth={onRequestAuth}
             onOpenDesafio={openDesafio}
-            onArmarPlus={(turnoId) => {
-              const canchaId = reservePrefill?.canchaId;
-              void queueOrRun(
-                { kind: "reserva_plus", canchaId, turnoId },
-                () => setReservaPlus({ kind: "plus", canchaId, turnoId })
-              );
-            }}
+            onArmarPlus={
+              featureFlags.reserva_plus_habilitada
+                ? (turnoId) => {
+                    const canchaId = reservePrefill?.canchaId;
+                    void queueOrRun(
+                      { kind: "reserva_plus", canchaId, turnoId },
+                      () => setReservaPlus({ kind: "plus", canchaId, turnoId })
+                    );
+                  }
+                : undefined
+            }
             onDone={() => {
               setReservePrefill(null);
               setExploreView("hub");
