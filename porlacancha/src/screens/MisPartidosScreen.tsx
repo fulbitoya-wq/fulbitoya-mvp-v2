@@ -7,6 +7,7 @@ import { cancelarInscripcion } from "../lib/inscripciones";
 import { ChevronLeft, iconStroke } from "../lib/icons";
 import { montoAPagar, pesos } from "../lib/plc";
 import {
+  esPartidoOculto,
   esPartidoProximo,
   listMisPartidos,
   puedeCancelarInscripcion,
@@ -133,12 +134,13 @@ export function MisPartidosScreen({
   }, [load]);
 
   const shown = useMemo(() => {
+    const vivos = items.filter((p) => !esPartidoOculto(p));
     if (tab === "proximos") {
-      return items
+      return vivos
         .filter(esPartidoProximo)
         .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora_inicio.localeCompare(b.hora_inicio));
     }
-    return items
+    return vivos
       .filter((p) => !esPartidoProximo(p))
       .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora_inicio.localeCompare(a.hora_inicio));
   }, [items, tab]);
@@ -180,7 +182,9 @@ export function MisPartidosScreen({
               showNotice("No se pudo cancelar", res.error);
               return;
             }
-            showNotice("Inscripción cancelada", "Si correspondía, el reembolso de la cancha quedó registrado.");
+            // Con solo cancelar desaparece de la lista (no hace falta borrar la card a mano).
+            setItems((prev) => prev.filter((x) => x.inscripcionId !== p.inscripcionId && x.id !== p.id));
+            showNotice("Partido cancelado", "Salí de la lista. Si correspondía, el reembolso de la cancha quedó registrado.");
             void load();
           });
         },

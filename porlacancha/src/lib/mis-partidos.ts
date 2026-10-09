@@ -39,9 +39,16 @@ function inicioMs(fecha: string, hora: string): number {
   return new Date(y, (m ?? 1) - 1, d ?? 1, hh ?? 0, mm ?? 0).getTime();
 }
 
+/** Cancelados / baja: no se listan en Mis partidos (ni próximos ni historial). */
+export function esPartidoOculto(p: MiPartido): boolean {
+  if (p.inscripcionEstado === "cancelada" || p.inscripcionEstado === "expirada") return true;
+  if (p.estado === "cancelado") return true;
+  return false;
+}
+
 export function esPartidoProximo(p: MiPartido): boolean {
-  if (p.inscripcionEstado === "cancelada" || p.inscripcionEstado === "expirada") return false;
-  if (p.estado === "cancelado" || p.estado === "finalizado") return false;
+  if (esPartidoOculto(p)) return false;
+  if (p.estado === "finalizado") return false;
   return inicioMs(p.fecha, p.hora_inicio) >= Date.now();
 }
 
@@ -126,5 +133,5 @@ export async function listMisPartidos(): Promise<{ ok: true; items: MiPartido[] 
     };
   });
 
-  return { ok: true, items };
+  return { ok: true, items: items.filter((p) => !esPartidoOculto(p)) };
 }
