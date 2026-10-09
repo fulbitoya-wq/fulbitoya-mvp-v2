@@ -518,9 +518,6 @@ export function MainTabs({ onRequestAuth }: Props) {
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      {profile?.rol === "owner" ? (
-        <Text style={styles.ownerHint}>En PorLaCancha estás como jugador.</Text>
-      ) : null}
       <View style={styles.body}>
         {loggedIn && profileGate === "username" ? (
           <CompleteUsernameScreen />
@@ -968,12 +965,5 @@ export function MainTabs({ onRequestAuth }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "transparent" },
-  ownerHint: {
-    textAlign: "center",
-    paddingTop: 48,
-    paddingBottom: 4,
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
   body: { flex: 1 },
 });
