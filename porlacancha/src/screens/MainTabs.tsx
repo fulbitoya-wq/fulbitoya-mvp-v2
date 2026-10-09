@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, StyleSheet, Text, View } from "react-native";
+import { AppState, StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { colors } from "@shared/design";
+import { colors, featureFlags } from "@shared/design";
 import { useAuth } from "../auth/AuthProvider";
 import { getDesafioPorId, getDesafiosPublicos, type Desafio } from "../lib/desafios";
 import { listInvitacionesRecibidas, listMisEquipos, equiposDondeEsCapitan, type EquipoListItem } from "../lib/equipos";
@@ -518,9 +518,6 @@ export function MainTabs({ onRequestAuth }: Props) {
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      {profile?.rol === "owner" ? (
-        <Text style={styles.ownerHint}>En PorLaCancha estás como jugador.</Text>
-      ) : null}
       <View style={styles.body}>
         {loggedIn && profileGate === "username" ? (
           <CompleteUsernameScreen />
@@ -554,7 +551,7 @@ export function MainTabs({ onRequestAuth }: Props) {
               });
             }}
           />
-        ) : reservaPlus ? (
+        ) : reservaPlus && featureFlags.reserva_plus_habilitada ? (
           <ReservaPlusWizard
             captainTeams={equiposDondeEsCapitan(equipos)}
             initial={reservaPlus}
@@ -675,6 +672,7 @@ export function MainTabs({ onRequestAuth }: Props) {
             initial={reservaDetalle}
             onBack={() => setReservaDetalle(null)}
             onPasarAPlus={(reservaId) => {
+              if (!featureFlags.reserva_plus_habilitada) return;
               setReservaDetalle(null);
               void queueOrRun({ kind: "reserva_plus", fromReservaId: reservaId }, () =>
                 setReservaPlus({ kind: "plus", fromReservaId: reservaId })
@@ -716,10 +714,14 @@ export function MainTabs({ onRequestAuth }: Props) {
             loading={loading}
             error={error}
             guest={!loggedIn}
+            myUserId={profile?.id}
             selectedId={selectedId}
             preferMap={preferMap}
             onSelectId={setSelectedId}
             onOpenDesafio={openDesafio}
+            onArmar={() => {
+              void queueOrRun({ kind: "crear_partido" }, () => setCrearPartidoOpen(true));
+            }}
             unreadNotifs={unreadNotifs}
             onOpenNotifs={openNotifs}
           />
@@ -771,13 +773,17 @@ export function MainTabs({ onRequestAuth }: Props) {
             }}
             onRequestAuth={onRequestAuth}
             onOpenDesafio={openDesafio}
-            onArmarPlus={(turnoId) => {
-              const canchaId = reservePrefill?.canchaId;
-              void queueOrRun(
-                { kind: "reserva_plus", canchaId, turnoId },
-                () => setReservaPlus({ kind: "plus", canchaId, turnoId })
-              );
-            }}
+            onArmarPlus={
+              featureFlags.reserva_plus_habilitada
+                ? (turnoId) => {
+                    const canchaId = reservePrefill?.canchaId;
+                    void queueOrRun(
+                      { kind: "reserva_plus", canchaId, turnoId },
+                      () => setReservaPlus({ kind: "plus", canchaId, turnoId })
+                    );
+                  }
+                : undefined
+            }
             onDone={() => {
               setReservePrefill(null);
               setExploreView("hub");
@@ -793,6 +799,10 @@ export function MainTabs({ onRequestAuth }: Props) {
             onRequestAuth={onRequestAuth}
             onOpenPredio={(canchaId) => {
               setReservePrefill({ canchaId });
+              setExploreView("predio");
+            }}
+            onReservarTurno={(canchaId, turnoId) => {
+              setReservePrefill({ canchaId, turnoId });
               setExploreView("predio");
             }}
             initialCanchaId={reservePrefill?.canchaId ?? null}
@@ -956,12 +966,5 @@ export function MainTabs({ onRequestAuth }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "transparent" },
-  ownerHint: {
-    textAlign: "center",
-    paddingTop: 48,
-    paddingBottom: 4,
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
   body: { flex: 1 },
 });

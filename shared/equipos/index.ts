@@ -41,6 +41,7 @@ export {
   rpcCotizarReserva,
   rpcOpcionesCobroReserva,
   rpcIniciarCheckoutReserva,
+  rpcReservarTurnoGratis,
   rpcConfirmarPagoReservaPrueba,
   rpcCancelarReservaPlc,
   rpcSetCheckoutPrueba,

@@ -435,6 +435,24 @@ export async function rpcIniciarCheckoutReserva(
   });
 }
 
+/** Beta: reserva sin seña del predio → gratis en la app. */
+export async function rpcReservarTurnoGratis(
+  client: EquiposRpcClient,
+  disponibilidadId: string,
+  aceptaReglas: boolean
+): Promise<RpcResult<{ reserva_id?: string; gratis?: boolean }>> {
+  const res = await call(client, "plc_reservar_turno_gratis", {
+    p_disponibilidad_id: disponibilidadId,
+    p_acepta_reglas: aceptaReglas,
+  });
+  if (!res.ok) return res;
+  return {
+    ok: true,
+    reserva_id: res.reserva_id ? String(res.reserva_id) : undefined,
+    gratis: res.gratis === true || res.gratis === "true",
+  };
+}
+
 export async function rpcConfirmarPagoReservaPrueba(
   client: EquiposRpcClient,
   holdId: string

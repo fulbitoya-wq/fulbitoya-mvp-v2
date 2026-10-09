@@ -49,7 +49,8 @@ export async function getDesafiosPublicos(): Promise<{
   data: Desafio[];
   error: string | null;
 }> {
-  const today = new Date().toISOString().slice(0, 10);
+  // Local calendar date (AR), not UTC — toISOString flips the day after ~21:00 ART.
+  const today = localIsoDate(0);
   const { data, error } = await supabase
     .from("desafios")
     .select(

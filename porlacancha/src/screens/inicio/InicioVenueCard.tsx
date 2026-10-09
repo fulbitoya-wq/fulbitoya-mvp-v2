@@ -1,10 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from "react-native";
 import { colors, radius, space } from "@shared/design";
+import { CANCHA_DEFAULT } from "../../lib/default-cancha";
 import { formatHora } from "../../lib/desafios";
 import { MapPin, iconStroke } from "../../lib/icons";
 import { typeStyle } from "../../ui/textStyle";
 
-export type InicioTurnoChip = { id: string; hora: string };
+export type InicioTurnoChip = { id: string; hora: string; precioLabel?: string | null };
 
 type Props = {
   nombre: string;
@@ -12,6 +13,7 @@ type Props = {
   distancia: string | null;
   detalles: string;
   hours: InicioTurnoChip[];
+  imageUri?: string | null;
   onPressVenue?: () => void;
   onPressHour: (turnoId: string) => void;
 };
@@ -22,19 +24,31 @@ export function InicioVenueCard({
   distancia,
   detalles,
   hours,
+  imageUri,
   onPressVenue,
   onPressHour,
 }: Props) {
+  const source: ImageSourcePropType = imageUri ? { uri: imageUri } : CANCHA_DEFAULT;
+
   return (
     <View style={styles.card}>
+      {/* Imagen al borde izquierdo, alto = toda la card */}
       <Pressable
         onPress={onPressVenue}
         disabled={!onPressVenue}
         accessibilityRole={onPressVenue ? "button" : undefined}
-        style={styles.mainHit}
+        style={styles.photoHit}
       >
-        <View style={styles.photo} />
-        <View style={styles.bodyTop}>
+        <Image source={source} style={styles.photo} resizeMode="cover" />
+      </Pressable>
+
+      <View style={styles.content}>
+        <Pressable
+          onPress={onPressVenue}
+          disabled={!onPressVenue}
+          accessibilityRole={onPressVenue ? "button" : undefined}
+          style={styles.bodyTop}
+        >
           <View style={styles.titleRow}>
             <Text style={styles.name} numberOfLines={1}>
               {nombre}
@@ -50,25 +64,27 @@ export function InicioVenueCard({
             </View>
           ) : null}
           {detalles ? <Text style={styles.tipos}>{detalles}</Text> : null}
-        </View>
-      </Pressable>
-      <View style={styles.bodyHours}>
-        <Text style={styles.sub}>Horarios disponibles</Text>
-        <View style={styles.hours}>
-          {hours.map((h) => (
-            <Pressable
-              key={h.id}
-              onPress={() => onPressHour(h.id)}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={`Reservar ${formatHora(h.hora)}`}
-              style={styles.hourHit}
-            >
-              <View style={styles.hour}>
-                <Text style={styles.hourT}>{formatHora(h.hora)}</Text>
-              </View>
-            </Pressable>
-          ))}
+        </Pressable>
+
+        <View style={styles.bodyHours}>
+          <Text style={styles.sub}>Horarios disponibles</Text>
+          <View style={styles.hours}>
+            {hours.map((h) => (
+              <Pressable
+                key={h.id}
+                onPress={() => onPressHour(h.id)}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={`Reservar ${formatHora(h.hora)}${h.precioLabel ? ` ${h.precioLabel}` : ""}`}
+                style={styles.hourHit}
+              >
+                <View style={styles.hour}>
+                  <Text style={styles.hourT}>{formatHora(h.hora)}</Text>
+                  {h.precioLabel ? <Text style={styles.priceT}>{h.precioLabel}</Text> : null}
+                </View>
+              </Pressable>
+            ))}
+          </View>
         </View>
       </View>
     </View>
@@ -77,6 +93,8 @@ export function InicioVenueCard({
 
 const styles = StyleSheet.create({
   card: {
+    flexDirection: "row",
+    alignItems: "stretch",
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -84,9 +102,17 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     minHeight: 118,
   },
-  mainHit: { flexDirection: "row" },
-  photo: { width: 92, minHeight: 92, backgroundColor: colors.navyDark },
-  bodyTop: { flex: 1, padding: space[12], gap: 4, paddingBottom: 4 },
+  photoHit: {
+    width: 104,
+    alignSelf: "stretch",
+  },
+  photo: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: colors.navyDark,
+  },
+  content: { flex: 1, minWidth: 0 },
+  bodyTop: { padding: space[12], gap: 4, paddingBottom: 4 },
   bodyHours: { paddingHorizontal: space[12], paddingBottom: space[12] },
   titleRow: {
     flexDirection: "row",
@@ -107,14 +133,17 @@ const styles = StyleSheet.create({
   hours: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
   hourHit: { minHeight: 48, justifyContent: "center" },
   hour: {
-    height: 40,
+    minHeight: 40,
     minWidth: 64,
     paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 13,
     borderWidth: 1,
     borderColor: "rgba(139,201,235,0.45)",
     alignItems: "center",
     justifyContent: "center",
+    gap: 2,
   },
   hourT: typeStyle("bodySmall", colors.white),
+  priceT: typeStyle("caption", colors.gold),
 });

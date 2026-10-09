@@ -239,7 +239,7 @@ export function MisPartidosScreen({
               {p.inscripcionEstado === "cancelada" ? (
                 <Chip label="Inscripción cancelada" tone="cancelled" />
               ) : null}
-              {p.inscripcionEstado === "pendiente_pago" ? (
+              {p.inscripcionEstado === "pendiente_pago" && p.modalidad === "por_la_cancha" ? (
                 <Chip label="Pendiente de pago" tone="payment" />
               ) : null}
             </>

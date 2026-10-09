@@ -14,6 +14,36 @@ export type InscripcionMia = {
   convocados: string[];
 };
 
+export type ConvocadoPlantel = {
+  usuarioId: string;
+  label: string;
+};
+
+/** Nombres de convocados de una inscripción (para la cancha del detalle). */
+export async function listarConvocadosPlantel(inscripcionId: string): Promise<ConvocadoPlantel[]> {
+  const { data: conv, error } = await supabase
+    .from("desafio_convocados")
+    .select("usuario_id")
+    .eq("inscripcion_id", inscripcionId);
+  if (error || !conv?.length) return [];
+  const ids = conv.map((c) => String((c as { usuario_id: string }).usuario_id)).filter(Boolean);
+  if (ids.length === 0) return [];
+  const { data: users } = await supabase.from("usuarios").select("id, nombre, username").in("id", ids);
+  const byId = new Map(
+    (users ?? []).map((u) => {
+      const row = u as { id: string; nombre: string | null; username: string | null };
+      const label =
+        (row.nombre && row.nombre.trim()) ||
+        (row.username ? `@${row.username}` : "Jugador");
+      return [String(row.id), label] as const;
+    })
+  );
+  return ids.map((id) => ({
+    usuarioId: id,
+    label: byId.get(id) ?? "Jugador",
+  }));
+}
+
 export async function getInscripcionMia(
   desafioId: string,
   equipoIds: string[],

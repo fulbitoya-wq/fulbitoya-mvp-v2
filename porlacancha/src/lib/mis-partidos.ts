@@ -26,10 +26,11 @@ type RpcItem = {
   descripcion: string | null;
   estado: string;
   cancha_id: string | null;
+  modalidad?: string | null;
   inscripcion_id: string;
   inscripcion_estado: string;
-  mi_equipo_id: string;
-  mi_equipo_nombre: string;
+  mi_equipo_id: string | null;
+  mi_equipo_nombre: string | null;
   mi_rol: string;
 };
 
@@ -120,12 +121,13 @@ export async function listMisPartidos(): Promise<{ ok: true; items: MiPartido[] 
       descripcion: x.descripcion,
       estado: x.estado,
       cancha_id: x.cancha_id,
+      modalidad: x.modalidad ?? null,
       inscritos,
       cupos: CUPOS_DESAFIO,
       inscripcionId: x.inscripcion_id,
       inscripcionEstado: x.inscripcion_estado,
-      miEquipoId: x.mi_equipo_id,
-      miEquipoNombre: x.mi_equipo_nombre,
+      miEquipoId: x.mi_equipo_id ?? null,
+      miEquipoNombre: x.mi_equipo_nombre ?? null,
       miEquipoEscudo: mio?.escudo_url ?? null,
       miRol: x.mi_rol === "capitan" ? "capitan" : x.mi_rol === "plantel" ? "plantel" : "convocado",
       rivalNombre: rival?.nombre ?? null,

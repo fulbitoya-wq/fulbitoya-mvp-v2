@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, gradientRn, radius, space } from "@shared/design";
+import { colors, featureFlags, gradientRn, radius, space } from "@shared/design";
 import { useAuth } from "../../auth/AuthProvider";
 import {
   etiquetaTipoCorta,
@@ -41,6 +41,7 @@ import {
   pagarReserva,
   pesosReserva,
   reglasPredioUrl,
+  reservarTurnoGratis,
   type OpcionesCobroReserva,
 } from "../../lib/reserva";
 import { compartirTexto } from "../../lib/share-text";
@@ -59,7 +60,7 @@ import {
   Warehouse,
   iconStroke,
 } from "../../lib/icons";
-import { Button, FilterChip, Mute, showNotice } from "../../ui";
+import { Button, FilterChip, Mute, showNotice, showSuccess } from "../../ui";
 import { CanchaMap } from "../../ui/maps/CanchaMap";
 import { PagoQrCard } from "../../ui/PagoQrCard";
 import { typeStyle } from "../../ui/textStyle";
@@ -69,8 +70,9 @@ import { ReservaPagoBlock } from "../reserva/ReservaPagoBlock";
 type TipoCobro = "sena" | "total";
 type ModoReserva = "simple" | "plus";
 
-/** Tarifa Plus mínima (display). El cobro real lo calcula el servidor en Fase 3. */
+/** Tarifa Plus mínima (display). Oculta en beta; el cobro real queda en el servidor. */
 const PLUS_TARIFA_DESDE = 1500;
+const PLUS_ON = featureFlags.reserva_plus_habilitada;
 
 type Props = {
   canchaId: string;
@@ -129,7 +131,9 @@ export function PredioDetalleScreen({
   const [fecha, setFecha] = useState<string>(dias[0] ?? "");
   const [campoId, setCampoId] = useState<string | "todos">("todos");
   const [turnoId, setTurnoId] = useState<string | null>(initialTurnoId);
-  const [modo, setModo] = useState<ModoReserva | null>(initialTurnoId ? "simple" : null);
+  const [modo, setModo] = useState<ModoReserva | null>(
+    initialTurnoId || !PLUS_ON ? "simple" : null
+  );
   const [tipo, setTipo] = useState<TipoCobro | null>(initialTipoCobro);
   const [opciones, setOpciones] = useState<OpcionesCobroReserva | null>(null);
   const [opcionesLoading, setOpcionesLoading] = useState(false);
@@ -180,6 +184,15 @@ export function PredioDetalleScreen({
       return;
     }
     setOpciones(res.data);
+    // Beta: solo seña (si hay). Sin seña → flujo gratis aparte.
+    if (!featureFlags.reserva_pago_total_habilitado) {
+      if (res.data.acepta_sena && res.data.opcion_sena.disponible) {
+        setTipo("sena");
+        return;
+      }
+      setTipo(null);
+      return;
+    }
     const only = onlyAvailable(res.data);
     if (only) {
       setTipo(only);
@@ -202,12 +215,15 @@ export function PredioDetalleScreen({
       setTipo(null);
       setAcepto(false);
       setQr(null);
-      setModo(null);
+      setModo(PLUS_ON ? null : "simple");
       return;
     }
-    if (modo !== "simple") {
+    if (PLUS_ON && modo !== "simple") {
       setOpciones(null);
       return;
+    }
+    if (!PLUS_ON && modo !== "simple") {
+      setModo("simple");
     }
     void loadOpciones(turnoId, tipoRef.current ?? initialTipoCobro);
   }, [turnoId, modo, loadOpciones, initialTipoCobro]);
@@ -243,10 +259,13 @@ export function PredioDetalleScreen({
     return s;
   }, [predio, campoId]);
 
+  const sinSena = Boolean(opciones && !opciones.acepta_sena);
   const ctaLabel = (() => {
     if (busy) return "Continuando...";
     if (!turnoId) return "Elegí un horario";
-    if (!modo) return "Elegí una opción";
+    if (PLUS_ON && !modo) return "Elegí una opción";
+    if (modo === "simple" && opciones && sinSena) return "Reservar gratis";
+    if (modo === "simple" && opciones?.acepta_sena) return "Pagar seña →";
     return "Continuar →";
   })();
 
@@ -259,7 +278,7 @@ export function PredioDetalleScreen({
   const selectTurno = (t: PredioTurno) => {
     if (t.estado !== "disponible") return;
     setTurnoId(t.id);
-    setModo(null);
+    setModo(PLUS_ON ? null : "simple");
     setQr(null);
     scrollToQueHacer();
   };
@@ -269,7 +288,7 @@ export function PredioDetalleScreen({
       showNotice("Horario", "Elegí un horario libre para continuar.");
       return;
     }
-    if (!modo) {
+    if (PLUS_ON && !modo) {
       showNotice("Reserva", "Elegí si querés reserva simple o Plus.");
       scrollToQueHacer();
       return;
@@ -282,8 +301,39 @@ export function PredioDetalleScreen({
       showNotice("Reserva Plus", "No se pudo abrir el armado Plus. Probá de nuevo desde el botón +.");
       return;
     }
+
+    // Beta: sin seña → reserva gratis (pago en el predio).
+    if (opciones && !opciones.acepta_sena) {
+      if (!acepto) {
+        showNotice("Reserva", "Aceptá las condiciones del predio.");
+        scrollRef.current?.scrollTo({ y: Math.max(pagoY.current - 24, 0), animated: true });
+        return;
+      }
+      if (!session?.access_token) {
+        await setPendingAction({
+          kind: "reservar",
+          canchaId,
+          turnoId,
+          tipoCobro: "total",
+          acepto: true,
+        });
+        onRequestAuth();
+        return;
+      }
+      setBusy(true);
+      const gratis = await reservarTurnoGratis(turnoId);
+      setBusy(false);
+      if (!gratis.ok) {
+        showNotice("No se pudo reservar", gratis.error);
+        return;
+      }
+      showSuccess("Tu turno quedó reservado", "Gratis en la app. La cancha se paga en el predio.");
+      onDone();
+      return;
+    }
+
     if (!tipo || !acepto) {
-      showNotice("Pago", "Elegí cómo pagar y aceptá las condiciones.");
+      showNotice("Pago", "Elegí la seña y aceptá las condiciones.");
       scrollRef.current?.scrollTo({ y: Math.max(pagoY.current - 24, 0), animated: true });
       return;
     }
@@ -306,7 +356,7 @@ export function PredioDetalleScreen({
       return;
     }
     if ("reservaId" in res) {
-      showNotice("Reserva", "El turno quedó reservado.");
+      showSuccess("Tu turno quedó reservado", "Ya figura en Mis partidos. ¡A disfrutar la cancha!");
       onDone();
       return;
     }
@@ -617,7 +667,7 @@ export function PredioDetalleScreen({
             <Text style={styles.section}>¿Qué querés hacer?</Text>
             {!turnoId ? (
               <Mute>Primero elegí un horario libre.</Mute>
-            ) : (
+            ) : PLUS_ON ? (
               <View style={styles.modoRow}>
                 <Pressable
                   onPress={() => {
@@ -631,7 +681,7 @@ export function PredioDetalleScreen({
                   {modo === "simple" ? <Text style={styles.modoCheck}>✓</Text> : null}
                   <Text style={styles.modoTitle}>Reserva simple</Text>
                   <Text style={styles.modoSub}>Ya tenemos los jugadores</Text>
-                  <Text style={styles.modoMeta}>Gratis para el jugador</Text>
+                  <Text style={styles.modoMeta}>Sin seña o con seña del predio</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => {
@@ -651,9 +701,11 @@ export function PredioDetalleScreen({
                   <Text style={styles.modoMeta}>Desde {pesosReserva(PLUS_TARIFA_DESDE)}</Text>
                 </Pressable>
               </View>
+            ) : (
+              <Mute>Reservá el turno. Si el predio pide seña, la pagás acá; si no, es gratis en la app.</Mute>
             )}
 
-            {modo === "plus" && turnoId ? (
+            {PLUS_ON && modo === "plus" && turnoId ? (
               <View style={[styles.emptyBox, { marginTop: space[12] }]}>
                 <Text style={styles.emptyT}>Configurás el partido en el próximo paso</Text>
                 <Mute>
@@ -668,20 +720,45 @@ export function PredioDetalleScreen({
                 pagoY.current = queHacerY.current + e.nativeEvent.layout.y;
               }}
             >
-              {modo === "simple" && turnoId && opcionesLoading ? (
-                <Mute>Calculando formas de pago…</Mute>
+              {(modo === "simple" || !PLUS_ON) && turnoId && opcionesLoading ? (
+                <Mute>Calculando…</Mute>
               ) : null}
-              {modo === "simple" && turnoId && opciones && !opcionesLoading ? (
-                <ReservaPagoBlock
-                  opciones={opciones}
-                  tipo={tipo}
-                  acepto={acepto}
-                  onSelectTipo={(t) => {
-                    setTipo(t);
-                    setQr(null);
-                  }}
-                  onToggleAcepto={() => setAcepto((v) => !v)}
-                />
+              {(modo === "simple" || !PLUS_ON) && turnoId && opciones && !opcionesLoading ? (
+                sinSena ? (
+                  <View style={{ marginTop: space[16], gap: space[12] }}>
+                    <Text style={styles.modoTitle}>Reserva gratis en la app</Text>
+                    <Mute>La cancha se paga en el predio. No hay seña configurada.</Mute>
+                    <Pressable
+                      onPress={() => setAcepto((v) => !v)}
+                      style={{ flexDirection: "row", alignItems: "center", gap: space[12], minHeight: 48 }}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: acepto }}
+                    >
+                      <View
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 4,
+                          borderWidth: 2,
+                          borderColor: colors.gold,
+                          backgroundColor: acepto ? colors.gold : "transparent",
+                        }}
+                      />
+                      <Text style={{ flex: 1, color: colors.white }}>Acepto las condiciones del predio</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <ReservaPagoBlock
+                    opciones={opciones}
+                    tipo={tipo}
+                    acepto={acepto}
+                    onSelectTipo={(t) => {
+                      setTipo(t);
+                      setQr(null);
+                    }}
+                    onToggleAcepto={() => setAcepto((v) => !v)}
+                  />
+                )
               ) : null}
               {qr && session?.access_token ? (
                 <View style={{ marginTop: space[16] }}>
@@ -690,7 +767,7 @@ export function PredioDetalleScreen({
                     holdId={qr.holdId}
                     accessToken={session.access_token}
                     onConfirmada={() => {
-                      showNotice("Reserva", "El pago se confirmó. El turno quedó reservado.");
+                      showSuccess("Tu turno quedó reservado", "El pago se confirmó. Ya figura en Mis partidos.");
                       onDone();
                     }}
                     onVencida={() => {
@@ -878,7 +955,13 @@ const styles = StyleSheet.create({
   dayEmpty: { opacity: 0.55 },
   dayT: typeStyle("bodySmall", colors.white),
   dayTOn: { color: colors.gold },
-  hoursGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  hoursGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 4,
+  },
   hourChip: {
     minWidth: 88,
     minHeight: 56,

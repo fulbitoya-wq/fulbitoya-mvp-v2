@@ -93,7 +93,8 @@ export function InicioScreen({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { profile } = useAuth();
-  const [when, setWhen] = useState<WhenFilter>("hoy");
+  // Default "todos": crear partido often picks a day in the next 2 weeks, not only hoy.
+  const [when, setWhen] = useState<WhenFilter>("todos");
   const [tipo, setTipo] = useState<TipoFilter>("todos");
   const [zona, setZona] = useState("");
   const [proximos, setProximos] = useState<MiPartido[]>([]);
