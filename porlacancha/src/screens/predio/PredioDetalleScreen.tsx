@@ -955,7 +955,13 @@ const styles = StyleSheet.create({
   dayEmpty: { opacity: 0.55 },
   dayT: typeStyle("bodySmall", colors.white),
   dayTOn: { color: colors.gold },
-  hoursGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  hoursGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 4,
+  },
   hourChip: {
     minWidth: 88,
     minHeight: 56,
