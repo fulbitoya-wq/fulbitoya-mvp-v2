@@ -8,7 +8,7 @@ import {
   type PlacesHint,
 } from "../lib/places-web";
 import { webBaseUrl } from "../lib/web-url";
-import { Mute } from "./index";
+import { Mute } from "./Copy";
 import { typeStyle } from "./textStyle";
 
 export type PlacePick = {
