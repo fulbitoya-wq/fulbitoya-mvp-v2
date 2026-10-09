@@ -8,11 +8,17 @@ export type PlantelSlot = {
   label: string;
 };
 
+export type PlantelSlotTap = {
+  index: number;
+  pos: string;
+  player: PlantelSlot | null;
+};
+
 type Props = {
   tipo: string;
   filled: PlantelSlot[];
-  onPressEmpty?: () => void;
-  onPressFilled?: () => void;
+  onPressEmpty?: (slot: PlantelSlotTap) => void;
+  onPressFilled?: (slot: PlantelSlotTap) => void;
 };
 
 /** Etiquetas tipo Pista: arquero + jugadores de campo según formato. */
@@ -53,14 +59,20 @@ export function PlantelPitch({ tipo, filled, onPressEmpty, onPressFilled }: Prop
   const filaBaja = campo.slice(mid);
 
   const Slot = ({
+    index,
     pos,
     player,
   }: {
+    index: number;
     pos: string;
     player: PlantelSlot | null;
   }) => (
     <Pressable
-      onPress={() => (player ? onPressFilled?.() : onPressEmpty?.())}
+      onPress={() => {
+        const tap = { index, pos, player };
+        if (player) onPressFilled?.(tap);
+        else onPressEmpty?.(tap);
+      }}
       style={[styles.slot, player ? styles.slotOn : styles.slotOff]}
       accessibilityRole="button"
       accessibilityLabel={player ? `${pos}: ${player.label}` : `${pos} libre`}
@@ -81,12 +93,20 @@ export function PlantelPitch({ tipo, filled, onPressEmpty, onPressFilled }: Prop
 
   return (
     <View style={styles.pitch}>
-      <View style={styles.row}>{filaAlta.map((s, i) => <Slot key={`a-${i}`} pos={s.pos} player={s.player} />)}</View>
+      <View style={styles.row}>
+        {filaAlta.map((s, i) => (
+          <Slot key={`a-${i}`} index={1 + i} pos={s.pos} player={s.player} />
+        ))}
+      </View>
       {filaBaja.length > 0 ? (
-        <View style={styles.row}>{filaBaja.map((s, i) => <Slot key={`b-${i}`} pos={s.pos} player={s.player} />)}</View>
+        <View style={styles.row}>
+          {filaBaja.map((s, i) => (
+            <Slot key={`b-${i}`} index={1 + mid + i} pos={s.pos} player={s.player} />
+          ))}
+        </View>
       ) : null}
       <View style={styles.rowArq}>
-        <Slot pos={arq.pos} player={arq.player} />
+        <Slot index={0} pos={arq.pos} player={arq.player} />
       </View>
       <Text style={styles.hint}>
         {filled.length}/{labels.length} en cancha

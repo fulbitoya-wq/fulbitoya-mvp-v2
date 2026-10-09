@@ -32,6 +32,7 @@ export { PlayerStatsRow } from "./players/PlayerStatsRow";
 export { PlayerTeamMiniBadge } from "./players/PlayerTeamMiniBadge";
 export { PlacesSearch, type PlacePick } from "./PlacesSearch";
 export { ZonaSearch, type ZonaPick } from "./ZonaSearch";
+export { SumarJugadorModal } from "./SumarJugadorModal";
 export { DateField } from "./DateField";
 export { TimeField } from "./TimeField";
 export { BirthdateField } from "./BirthdateField";

@@ -15,33 +15,63 @@ export type InscripcionMia = {
 };
 
 export type ConvocadoPlantel = {
-  usuarioId: string;
+  /** Usuario de la plataforma; null si es invitado sin cuenta. */
+  usuarioId: string | null;
   label: string;
+  esInvitado?: boolean;
+  miembroId?: string;
 };
 
-/** Nombres de convocados de una inscripción (para la cancha del detalle). */
-export async function listarConvocadosPlantel(inscripcionId: string): Promise<ConvocadoPlantel[]> {
+/** Convocados + invitados del equipo (para la cancha del detalle). */
+export async function listarConvocadosPlantel(
+  inscripcionId: string,
+  equipoId?: string | null
+): Promise<ConvocadoPlantel[]> {
   const { data: conv, error } = await supabase
     .from("desafio_convocados")
     .select("usuario_id")
     .eq("inscripcion_id", inscripcionId);
-  if (error || !conv?.length) return [];
-  const ids = conv.map((c) => String((c as { usuario_id: string }).usuario_id)).filter(Boolean);
-  if (ids.length === 0) return [];
-  const { data: users } = await supabase.from("usuarios").select("id, nombre, username").in("id", ids);
-  const byId = new Map(
-    (users ?? []).map((u) => {
-      const row = u as { id: string; nombre: string | null; username: string | null };
-      const label =
-        (row.nombre && row.nombre.trim()) ||
-        (row.username ? `@${row.username}` : "Jugador");
-      return [String(row.id), label] as const;
-    })
-  );
-  return ids.map((id) => ({
-    usuarioId: id,
-    label: byId.get(id) ?? "Jugador",
-  }));
+  const ids = error
+    ? []
+    : (conv ?? []).map((c) => String((c as { usuario_id: string }).usuario_id)).filter(Boolean);
+
+  const out: ConvocadoPlantel[] = [];
+  if (ids.length > 0) {
+    const { data: users } = await supabase.from("usuarios").select("id, nombre, username").in("id", ids);
+    const byId = new Map(
+      (users ?? []).map((u) => {
+        const row = u as { id: string; nombre: string | null; username: string | null };
+        const label =
+          (row.nombre && row.nombre.trim()) ||
+          (row.username ? `@${row.username}` : "Jugador");
+        return [String(row.id), label] as const;
+      })
+    );
+    for (const id of ids) {
+      out.push({ usuarioId: id, label: byId.get(id) ?? "Jugador" });
+    }
+  }
+
+  if (equipoId) {
+    const { data: inv } = await supabase
+      .from("equipo_miembros")
+      .select("id, invitado_nombre")
+      .eq("equipo_id", equipoId)
+      .eq("es_invitado", true)
+      .eq("estado", "activo");
+    for (const row of inv ?? []) {
+      const r = row as { id: string; invitado_nombre: string | null };
+      const label = (r.invitado_nombre && r.invitado_nombre.trim()) || "Invitado";
+      out.push({
+        usuarioId: null,
+        label,
+        esInvitado: true,
+        miembroId: String(r.id),
+      });
+    }
+  }
+
+  return out;
 }
 
 export async function getInscripcionMia(
