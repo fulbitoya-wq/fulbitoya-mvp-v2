@@ -8,6 +8,7 @@ import {
   esManana,
   esSoloCancha,
   formatFechaCorta,
+  normalizarTipo,
   type Desafio,
 } from "../lib/desafios";
 import { getUserLocation, haversineKm, type LatLng } from "../lib/geo";
@@ -111,6 +112,10 @@ export function ExplorarScreen({
     if (zona) {
       setAnchor({ lat: zona.lat, lng: zona.lng });
       setHasZone(true);
+    } else {
+      // Clearing the search must drop the GPS/places hard filter.
+      setHasZone(false);
+      setAnchor(null);
     }
   }, [zona]);
 
@@ -124,13 +129,18 @@ export function ExplorarScreen({
         if (when === "hoy" && !esHoy(d.fecha)) return false;
         if (when === "manana" && !esManana(d.fecha)) return false;
         if (when === "finde" && !esFinde(d.fecha)) return false;
-        if (tipo !== "todos" && d.tipo !== tipo) return false;
+        if (tipo !== "todos" && normalizarTipo(d.tipo) !== tipo) return false;
         if (modo === "premio" && esSoloCancha(Number(d.premio))) return false;
         if (modo === "cancha" && !esSoloCancha(Number(d.premio))) return false;
         if (hayLugar && (d.inscritos?.length ?? 0) >= (d.cupos || 2)) return false;
         if (hasZone && anchor) {
-          if (!Number.isFinite(d.lat) || !Number.isFinite(d.lng)) return false;
-          const km = haversineKm(anchor, { lat: Number(d.lat), lng: Number(d.lng) });
+          const lat = Number(d.lat);
+          const lng = Number(d.lng);
+          // coalesce(lat,0) in crear_partido_* — (0,0) means "unknown", not Gulf of Guinea.
+          const missingCoords =
+            !Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0);
+          if (missingCoords) return true;
+          const km = haversineKm(anchor, { lat, lng });
           if (km > NEAR_KM) return false;
         }
         return true;
