@@ -37,6 +37,7 @@ import {
   type PlacePick,
 } from "../ui";
 import { partidoDateBounds } from "../lib/fecha-ui";
+import { etiquetaDiaCorto, fechasProximos } from "../lib/predio-detalle";
 import { typeStyle } from "../ui/textStyle";
 import { CompleteIdentidadDesafioScreen } from "./auth/CompleteIdentidadDesafioScreen";
 
@@ -163,13 +164,15 @@ export function CrearPartidoScreen({
     return Object.values(by).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }, [turnosFmt]);
 
-  const diasFy = useMemo(() => {
-    if (!predioId) return [] as string[];
+  const diasAgenda = useMemo(() => fechasProximos(14), []);
+
+  const diasConLibres = useMemo(() => {
     const set = new Set<string>();
+    if (!predioId) return set;
     for (const t of turnosFmt) {
       if (t.cancha_id === predioId) set.add(t.fecha);
     }
-    return [...set].sort();
+    return set;
   }, [turnosFmt, predioId]);
 
   const horasFy = useMemo(() => {
@@ -185,6 +188,14 @@ export function CrearPartidoScreen({
     setDiaId(null);
     setTurnoId(null);
   }, [formato]);
+
+  useEffect(() => {
+    if (!predioId) return;
+    if (diaId && diasConLibres.has(diaId)) return;
+    const first = diasAgenda.find((f) => diasConLibres.has(f)) ?? null;
+    setDiaId(first);
+    setTurnoId(null);
+  }, [predioId, diasConLibres, diasAgenda, diaId]);
 
   useEffect(() => {
     if (!turnoId || origen !== "fulbitoya" || modalidad === "por_la_cancha") {
@@ -607,7 +618,7 @@ export function CrearPartidoScreen({
                   </Pressable>
                 ))}
               </>
-            ) : !diaId ? (
+            ) : (
               <>
                 <Pressable
                   onPress={() => {
@@ -620,50 +631,60 @@ export function CrearPartidoScreen({
                     {`← ${prediosFy.find((p) => p.id === predioId)?.nombre ?? "Predio"} · cambiar predio`}
                   </Mute>
                 </Pressable>
+
                 <Text style={[styles.h, { marginTop: space[8] }]}>Día</Text>
-                {diasFy.map((f) => (
-                  <Pressable
-                    key={f}
-                    onPress={() => {
-                      setDiaId(f);
-                      setTurnoId(null);
-                    }}
-                    style={styles.card}
-                  >
-                    <Text style={styles.body}>{formatFechaCorta(f)}</Text>
-                    <Mute>
-                      {`${turnosFmt.filter((t) => t.cancha_id === predioId && t.fecha === f).length} horarios`}
-                    </Mute>
-                  </Pressable>
-                ))}
-              </>
-            ) : (
-              <>
-                <Pressable
-                  onPress={() => {
-                    setDiaId(null);
-                    setTurnoId(null);
-                  }}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.dayRow}
                 >
-                  <Mute>{`← ${formatFechaCorta(diaId)} · cambiar día`}</Mute>
-                </Pressable>
-                <Text style={[styles.h, { marginTop: space[8] }]}>Horario</Text>
-                {horasFy.map((t) => (
-                  <Pressable
-                    key={t.id}
-                    onPress={() => {
-                      setTurnoId(t.id);
-                      if (t.precio != null) setPrecioCancha(String(Math.round(t.precio)));
-                    }}
-                    style={[styles.card, turnoId === t.id && styles.cardOn]}
-                  >
-                    <Text style={styles.body}>
-                      {formatHora(t.hora_inicio)}
-                      {t.precio != null ? ` · ${pesos(t.precio)}` : ""}
-                    </Text>
-                    <Mute>{`${t.campo_nombre} · ${etiquetaTipo(t.campo_tipo)}`}</Mute>
-                  </Pressable>
-                ))}
+                  {diasAgenda.map((f) => {
+                    const has = diasConLibres.has(f);
+                    const on = diaId === f;
+                    return (
+                      <Pressable
+                        key={f}
+                        onPress={() => {
+                          setDiaId(f);
+                          setTurnoId(null);
+                        }}
+                        style={[styles.dayChip, on && styles.dayOn, !has && styles.dayEmpty]}
+                      >
+                        <Text style={[styles.dayT, on && styles.dayTOn]}>
+                          {etiquetaDiaCorto(f, diasAgenda[0]!, diasAgenda[1]!)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+
+                <Text style={[styles.h, { marginTop: space[12] }]}>Horarios</Text>
+                {horasFy.length === 0 ? (
+                  <Mute>No hay horarios libres este día. Probá otro.</Mute>
+                ) : (
+                  <View style={styles.hoursGrid}>
+                    {horasFy.map((t) => {
+                      const on = turnoId === t.id;
+                      return (
+                        <Pressable
+                          key={t.id}
+                          onPress={() => {
+                            setTurnoId(t.id);
+                            if (t.precio != null) setPrecioCancha(String(Math.round(t.precio)));
+                          }}
+                          style={[styles.hourChip, on && styles.hourOn]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${formatHora(t.hora_inicio)}${
+                            t.precio != null ? ` ${pesos(t.precio)}` : ""
+                          }`}
+                        >
+                          <Text style={styles.hourH}>{formatHora(t.hora_inicio)}</Text>
+                          {t.precio != null ? <Text style={styles.hourP}>{pesos(t.precio)}</Text> : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </>
             )}
           </>
