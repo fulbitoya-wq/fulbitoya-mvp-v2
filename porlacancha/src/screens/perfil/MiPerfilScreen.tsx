@@ -1,4 +1,4 @@
-import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image,  Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, radius, space } from "@shared/design";
 import type { JugateLaProfile } from "../../auth/AuthProvider";
@@ -14,8 +14,7 @@ import {
   Trophy,
   User,
   Users,
-  iconStroke,
-} from "../../lib/icons";
+  iconStroke } from "../../lib/icons";
 import {
   displayName,
   edadDesde,
@@ -23,12 +22,10 @@ import {
   formatosLabel,
   labelModoJuego,
   splitNombre,
-  type FootballProfile,
-} from "../../lib/perfil";
+  type FootballProfile } from "../../lib/perfil";
 import { Button, Card, EmptyState, IconBtn, KvRow, Mute, NotifBell, PlayerAvatar, SectionTitle, showConfirm, TAB_BAR_CONTENT_INSET } from "../../ui";
 import { typeStyle } from "../../ui/textStyle";
 
-const fondoAzul = require("../../../assets/fondo-azul.jpeg");
 
 type Props = {
   guest: boolean;
@@ -69,8 +66,7 @@ export function MiPerfilScreen({
   onSignOut,
   email,
   unreadNotifs = 0,
-  onOpenNotifs,
-}: Props) {
+  onOpenNotifs }: Props) {
   const insets = useSafeAreaInsets();
   const split = splitNombre(profile?.nombre ?? null);
   const apellido = football.apellido || split.apellido;
@@ -86,7 +82,7 @@ export function MiPerfilScreen({
 
   if (guest) {
     return (
-      <ImageBackground source={fondoAzul} style={styles.fill} resizeMode="cover">
+      <View style={[styles.fill, { backgroundColor: colors.navy }]}>
         <View style={[styles.header, { paddingTop: Math.max(insets.top, space[16]) }]}>
           <Text style={styles.hTitle}>Perfil</Text>
         </View>
@@ -97,20 +93,20 @@ export function MiPerfilScreen({
             <Button label="Buscar jugadores" variant="secondary" onPress={onSearchPlayers} />
           </View>
         </View>
-      </ImageBackground>
+      </View>
     );
   }
 
   if (loadError) {
     return (
-      <ImageBackground source={fondoAzul} style={[styles.fill, styles.pad, { paddingTop: insets.top + space[24] }]} resizeMode="cover">
+      <View style={[styles.fill, styles.pad, { paddingTop: insets.top + space[24] }, { backgroundColor: colors.navy }]}>
         <EmptyState title="No pudimos cargar tu perfil" body={loadError} action={<Button label="Reintentar" onPress={onRetry} />} />
-      </ImageBackground>
+      </View>
     );
   }
 
   return (
-    <ImageBackground source={fondoAzul} style={styles.fill} resizeMode="cover">
+    <View style={[styles.fill, { backgroundColor: colors.navy }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: space[40] + TAB_BAR_CONTENT_INSET }}>
         <View style={[styles.header, { paddingTop: Math.max(insets.top, space[16]) }]}>
           <View style={styles.headRow}>
@@ -295,14 +291,13 @@ export function MiPerfilScreen({
                   cancelLabel: "Seguir conectado",
                   confirmLabel: "Cerrar sesión",
                   danger: true,
-                  onConfirm: onSignOut,
-                })
+                  onConfirm: onSignOut })
               }
             />
           </View>
         </View>
       </ScrollView>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -317,8 +312,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: "#1E6BFF",
     alignItems: "center",
-    justifyContent: "center",
-  },
+    justifyContent: "center" },
   identity: { alignItems: "center", marginTop: space[12], gap: space[8] },
   nameRow: { flexDirection: "row", alignItems: "center", gap: space[8] },
   name: typeStyle("h2", colors.white),
@@ -332,8 +326,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     paddingVertical: space[16],
-    marginBottom: space[20],
-  },
+    marginBottom: space[20] },
   actCol: { flex: 1, alignItems: "center", gap: 4 },
   actN: typeStyle("numM", colors.white),
   actL: typeStyle("caption", colors.textSecondary),
@@ -348,8 +341,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: space[12],
-  },
+    padding: space[12] },
   statN: typeStyle("numL", colors.white),
   statL: typeStyle("caption", colors.textSecondary),
   winRow: { flexDirection: "row", alignItems: "center", gap: space[12], marginTop: space[16] },
@@ -360,8 +352,7 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: colors.gold,
     alignItems: "center",
-    justifyContent: "center",
-  },
+    justifyContent: "center" },
   winN: typeStyle("numM", colors.gold),
   winL: typeStyle("bodySmall", colors.white),
   teamRow: { gap: space[12], paddingRight: space[16] },
@@ -372,10 +363,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: space[12],
-    gap: space[8],
-  },
+    gap: space[8] },
   crest: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceElevated },
   teamN: typeStyle("h3", colors.white),
   teamMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
-  teamR: typeStyle("caption", colors.textSecondary),
-});
+  teamR: typeStyle("caption", colors.textSecondary) });

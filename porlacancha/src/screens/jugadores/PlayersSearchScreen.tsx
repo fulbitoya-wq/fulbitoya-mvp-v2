@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  FlatList,
-  ImageBackground,
+  FlatList, 
   Modal,
   Pressable,
   ScrollView,
@@ -23,15 +22,13 @@ import {
   playerMatchesFilter,
   playerMatchesQuery,
   type PositionFilter,
-  type SearchPlayer,
-} from "../../lib/player-search";
+  type SearchPlayer } from "../../lib/player-search";
 import { Button, EmptyState, IconBtn, Mute } from "../../ui";
 import { PlayerCompactCard } from "../../ui/players/PlayerCompactCard";
 import { PlayerCompactCardSkeleton } from "../../ui/players/PlayerCompactCardSkeleton";
 import { PlayerRankLegend } from "../../ui/players/PlayerRankLegend";
 import { typeStyle } from "../../ui/textStyle";
 
-const fondoAzul2 = require("../../../assets/fondo-azul-2.jpeg");
 
 const FILTERS: { id: PositionFilter; label: string }[] = [
   { id: "all", label: "Todos" },
@@ -116,7 +113,7 @@ export function PlayersSearchScreen({ onBack, onOpenPlayer, onRequestAuth }: Pro
   };
 
   return (
-    <ImageBackground source={fondoAzul2} style={styles.fill} resizeMode="cover">
+    <View style={[styles.fill, { backgroundColor: colors.navy }]}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, space[8]) }]}>
         <View style={styles.headRow}>
           <IconBtn onPress={onBack} label="Volver">
@@ -246,7 +243,7 @@ export function PlayersSearchScreen({ onBack, onOpenPlayer, onRequestAuth }: Pro
           </Pressable>
         </Pressable>
       </Modal>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -255,8 +252,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: space[8],
     paddingBottom: space[12],
-    minHeight: 88,
-  },
+    minHeight: 88 },
   headRow: { flexDirection: "row", alignItems: "center" },
   title: { ...typeStyle("h3", colors.white), flex: 1, textAlign: "center" },
   searchRow: { flexDirection: "row", alignItems: "center", gap: space[8], paddingHorizontal: space[8], marginTop: space[8] },
@@ -268,22 +264,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: space[12],
-    gap: space[8],
-  },
+    gap: space[8] },
   input: {
     flex: 1,
     color: colors.white,
     fontFamily: fontFamily.ui,
-    fontSize: 14,
-  },
+    fontSize: 14 },
   filterBtn: {
     width: 48,
     height: 48,
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     alignItems: "center",
-    justifyContent: "center",
-  },
+    justifyContent: "center" },
   filtersPad: { paddingVertical: space[12] },
   filters: { paddingHorizontal: space[16], gap: space[8], alignItems: "center" },
   fchip: {
@@ -293,14 +286,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
+    backgroundColor: colors.surface },
   fchipOn: { backgroundColor: colors.sky, borderColor: colors.sky },
   fTxt: {
     fontFamily: fontFamily.uiBold,
     fontSize: 13,
-    color: colors.white,
-  },
+    color: colors.white },
   fTxtOn: { color: colors.navyDark },
   listPad: { paddingHorizontal: space[16], gap: 12, flexGrow: 1 },
   sheetBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
@@ -308,6 +299,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.navyDark,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
-    padding: space[24],
-  },
-});
+    padding: space[24] } });

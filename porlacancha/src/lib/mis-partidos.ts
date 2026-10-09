@@ -5,8 +5,10 @@ export type MiPartido = Desafio & {
   inscripcionEstado: string;
   miEquipoId: string | null;
   miEquipoNombre: string | null;
+  miEquipoEscudo: string | null;
   miRol: "capitan" | "convocado" | "plantel";
   rivalNombre: string | null;
+  rivalEscudo: string | null;
 };
 
 type RpcItem = {
@@ -92,6 +94,7 @@ export async function listMisPartidos(): Promise<{ ok: true; items: MiPartido[] 
 
   const items: MiPartido[] = raw.map((x) => {
     const inscritos = inscritosByDesafio.get(x.id) ?? [];
+    const mio = inscritos.find((e) => e.id === x.mi_equipo_id) ?? null;
     const rival = inscritos.find((e) => e.id !== x.mi_equipo_id) ?? null;
     return {
       id: x.id,
@@ -114,8 +117,10 @@ export async function listMisPartidos(): Promise<{ ok: true; items: MiPartido[] 
       inscripcionEstado: x.inscripcion_estado,
       miEquipoId: x.mi_equipo_id,
       miEquipoNombre: x.mi_equipo_nombre,
+      miEquipoEscudo: mio?.escudo_url ?? null,
       miRol: x.mi_rol === "capitan" ? "capitan" : x.mi_rol === "plantel" ? "plantel" : "convocado",
       rivalNombre: rival?.nombre ?? null,
+      rivalEscudo: rival?.escudo_url ?? null,
     };
   });
 

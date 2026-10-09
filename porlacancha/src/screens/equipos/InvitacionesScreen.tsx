@@ -1,4 +1,4 @@
-import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, space } from "@shared/design";
 import { mensajeErrorEquipo, rpcResponderSolicitud } from "@shared/equipos";
 import type { SolicitudItem } from "../../lib/equipos";
@@ -7,7 +7,6 @@ import { Button, TAB_BAR_CONTENT_INSET } from "../../ui";
 import { Check, X, iconStroke } from "../../lib/icons";
 import { useState } from "react";
 
-const fondoAzul3 = require("../../../assets/fondo-azul-3.jpeg");
 
 type Props = {
   items: SolicitudItem[];
@@ -30,7 +29,7 @@ export function InvitacionesScreen({ items, onBack, onChanged, onAccept }: Props
   };
 
   return (
-    <ImageBackground source={fondoAzul3} style={styles.page} resizeMode="cover">
+    <View style={[styles.page, { backgroundColor: colors.navy }]}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Pressable onPress={onBack}>
         <Text style={styles.back}>← Equipos</Text>
@@ -65,7 +64,7 @@ export function InvitacionesScreen({ items, onBack, onChanged, onAccept }: Props
         ))
       )}
       </ScrollView>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -89,8 +88,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.45,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
-  },
+    elevation: 8 },
   title: { fontWeight: "800", color: colors.white, marginBottom: 10 },
-  row: { flexDirection: "row", gap: space[12] },
-});
+  row: { flexDirection: "row", gap: space[12] } });

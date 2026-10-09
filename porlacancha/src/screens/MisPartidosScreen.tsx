@@ -4,6 +4,7 @@ import { colors, space } from "@shared/design";
 import type { Desafio } from "../lib/desafios";
 import { etiquetaEstado, chipToneEstado } from "../lib/desafios";
 import { cancelarInscripcion } from "../lib/inscripciones";
+import { montoAPagar, pesos } from "../lib/plc";
 import {
   esPartidoProximo,
   listMisPartidos,
@@ -33,7 +34,6 @@ import {
 } from "../ui";
 import { typeStyle } from "../ui/textStyle";
 
-const fondoAzul2 = require("../../assets/fondo-azul-2.jpeg");
 
 type Tab = "proximos" | "historial";
 
@@ -147,28 +147,43 @@ export function MisPartidosScreen({
   }, [reservas, tab]);
 
   const pedirCancelar = (p: MiPartido) => {
-    showConfirm({
-      title: "Cancelar inscripción",
-      body: "El lugar queda libre. Los convocados se enteran por el aviso.",
-      cancelLabel: "Volver",
-      confirmLabel: "Cancelar inscripción",
-      danger: true,
-      onConfirm: () => {
-        if (!p.inscripcionId) return;
-        void cancelarInscripcion(p.inscripcionId).then((res) => {
-          if (!res.ok) {
-            showNotice("No se pudo cancelar", res.error);
-            return;
-          }
-          void load();
-        });
-      },
-    });
+    void (async () => {
+      let body =
+        "El lugar queda libre. Los convocados se enteran por el aviso.";
+      if (p.inscripcionId && p.inscripcionEstado === "confirmada") {
+        const m = await montoAPagar(p.inscripcionId);
+        if (m.ok && m.montoCancha > 0) {
+          body =
+            `Pagaste ${pesos(m.montoTotal)} (cancha ${pesos(m.montoCancha)}` +
+            (m.montoServicio > 0 ? ` + tarifa app ${pesos(m.montoServicio)}` : "") +
+            `).\n\nSe retiene la tarifa de uso de la app (${pesos(m.montoServicio)}).\n` +
+            `Te devolvemos ${pesos(m.montoCancha)} (la cancha).`;
+        }
+      }
+      showConfirm({
+        title: "Cancelar inscripción",
+        body,
+        cancelLabel: "Volver",
+        confirmLabel: "Cancelar inscripción",
+        danger: true,
+        onConfirm: () => {
+          if (!p.inscripcionId) return;
+          void cancelarInscripcion(p.inscripcionId).then((res) => {
+            if (!res.ok) {
+              showNotice("No se pudo cancelar", res.error);
+              return;
+            }
+            showNotice("Inscripción cancelada", "Si correspondía, el reembolso de la cancha quedó registrado.");
+            void load();
+          });
+        },
+      });
+    })();
   };
 
   if (guest) {
     return (
-      <Screen scroll background={fondoAzul2} tabBar>
+      <Screen scroll tabBar>
         <Kicker>Calendario</Kicker>
         <Heading>Mis partidos</Heading>
         <EmptyState
@@ -181,7 +196,7 @@ export function MisPartidosScreen({
   }
 
   return (
-    <Screen background={fondoAzul2} tabBar>
+    <Screen tabBar>
       <Kicker>Calendario</Kicker>
       <Heading>Mis partidos</Heading>
       <View style={styles.tabs}>

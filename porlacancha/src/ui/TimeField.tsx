@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, radius, space } from "@shared/design";
-import { formatHora24, halfHourSlots } from "../lib/fecha-ui";
+import { formatHora24, hourSlots } from "../lib/fecha-ui";
 import { typeStyle } from "./textStyle";
 
 type Props = {
@@ -11,7 +11,7 @@ type Props = {
   label?: string;
 };
 
-const SLOTS = halfHourSlots();
+const SLOTS = hourSlots();
 
 export function TimeField({ value, onChange, placeholder = "Elegí la hora", label }: Props) {
   const [open, setOpen] = useState(false);

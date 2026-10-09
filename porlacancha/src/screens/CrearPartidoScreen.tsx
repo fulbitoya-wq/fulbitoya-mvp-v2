@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { esErrorIdentidadDesafio } from "@shared/equipos";
 import { colors, radius, space } from "@shared/design";
 import { rpcInvitarSinCuenta } from "@shared/equipos";
 import type { EquipoListItem, MiembroPlantel } from "../lib/equipos";
 import { getEquipoDetalle } from "../lib/equipos";
-import { etiquetaTipo, formatFechaCorta, formatHora, minimoConvocados } from "../lib/desafios";
+import { etiquetaTipo, formatFechaCorta, formatHora, minimoConvocados, normalizarTipo } from "../lib/desafios";
 import {
   calcularCondiciones,
+  confirmarPagoPrueba,
   cotizarDepositoPlc,
   crearEquipoRapidoPlc,
   crearPartidoDepositoPlc,
@@ -88,6 +89,14 @@ export function CrearPartidoScreen({
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [invitadoNombre, setInvitadoNombre] = useState("");
   const [invitando, setInvitando] = useState(false);
+  const [pagoCrear, setPagoCrear] = useState<{
+    desafioId: string;
+    inscripcionId: string;
+    cancha: number;
+    servicio: number;
+    total: number;
+  } | null>(null);
+  const [pagando, setPagando] = useState(false);
 
   const equipo = captainTeams.find((t) => t.id === equipoId);
   const formato =
@@ -129,7 +138,7 @@ export function CrearPartidoScreen({
   };
 
   const turnosFmt = useMemo(
-    () => turnos.filter((t) => String(t.campo_tipo).toLowerCase() === formato),
+    () => turnos.filter((t) => normalizarTipo(t.campo_tipo) === normalizarTipo(formato)),
     [turnos, formato]
   );
 
@@ -337,7 +346,16 @@ export function CrearPartidoScreen({
           showNotice("No se pudo publicar", res.error);
           return;
         }
-        onCreated(res.desafioId, res.inscripcionId);
+        const cancha = Number(cotDep?.deposito ?? precio) || 0;
+        const servicio = Number(cotDep?.tarifa ?? 0) || 0;
+        const total = Number(cotDep?.total_equipo ?? res.montoTotal) || cancha + servicio;
+        setPagoCrear({
+          desafioId: res.desafioId,
+          inscripcionId: res.inscripcionId,
+          cancha,
+          servicio,
+          total,
+        });
         return;
       }
 
@@ -759,8 +777,8 @@ export function CrearPartidoScreen({
                 ? "Publicando..."
                 : esLibrePlaces
                   ? "Publicar partido gratis"
-                  : esDeposito
-                    ? "Publicar y continuar al pago"
+                    : esDeposito
+                    ? "Publicar y pagar"
                     : "Publicar y continuar al pago"
             }
             onPress={() => void publicar()}
@@ -772,6 +790,53 @@ export function CrearPartidoScreen({
           />
         </View>
       </ScrollView>
+
+      {pagoCrear ? (
+        <Modal visible transparent animationType="slide" onRequestClose={() => undefined}>
+          <Pressable style={styles.pagoBg} onPress={() => undefined}>
+            <Pressable
+              style={[styles.pagoSheet, { paddingBottom: Math.max(insets.bottom, space[16]) + space[8] }]}
+              onPress={() => undefined}
+            >
+              <Text style={styles.h}>Pagar cancha de anticipado</Text>
+              <Mute>Confirmá el total para publicar el partido. En modo prueba no se abre Mercado Pago.</Mute>
+              <Text style={[styles.pagoTotalKicker, { marginTop: space[16] }]}>Total a pagar</Text>
+              <Text style={styles.pagoTotal}>{pesos(pagoCrear.total)}</Text>
+              <Mute>
+                {pagoCrear.servicio > 0
+                  ? `Cancha ${pesos(pagoCrear.cancha)} + tarifa ${pesos(pagoCrear.servicio)}.`
+                  : "Depósito de la cancha."}
+              </Mute>
+              <View style={{ gap: space[8], marginTop: space[16] }}>
+                <Button
+                  label={pagando ? "Confirmando..." : `Pagar ${pesos(pagoCrear.total)}`}
+                  loading={pagando}
+                  disabled={pagando}
+                  onPress={() => {
+                    void (async () => {
+                      setPagando(true);
+                      const pay = await confirmarPagoPrueba(pagoCrear.inscripcionId);
+                      setPagando(false);
+                      if (!pay.ok) {
+                        if (esErrorIdentidadDesafio(pay.code)) {
+                          setNeedIdentidad(true);
+                          return;
+                        }
+                        showNotice("No se pudo confirmar el pago", pay.error);
+                        return;
+                      }
+                      const done = pagoCrear;
+                      setPagoCrear(null);
+                      showNotice("Listo", "Partido publicado y cancha pagada de anticipado.");
+                      onCreated(done.desafioId, done.inscripcionId);
+                    })();
+                  }}
+                />
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
     </View>
   );
 }
@@ -782,6 +847,18 @@ const styles = StyleSheet.create({
   title: { ...typeStyle("h3", colors.white), flex: 1, textAlign: "center" },
   h: typeStyle("h3", colors.white),
   body: typeStyle("body", colors.white),
+  pagoBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  pagoSheet: {
+    backgroundColor: colors.navyDark,
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: space[20],
+    paddingTop: space[20],
+  },
+  pagoTotalKicker: typeStyle("caption", colors.textSecondary),
+  pagoTotal: typeStyle("numL", colors.gold),
   err: { ...typeStyle("caption", colors.danger), marginTop: space[8] },
   rowWrap: { flexDirection: "row", flexWrap: "wrap", gap: space[8], marginVertical: space[8] },
   origenRow: {

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ImageBackground, Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, radius, space } from "@shared/design";
 import type { JugateLaProfile } from "../../auth/AuthProvider";
@@ -17,8 +17,7 @@ import {
   LogOut,
   Shield,
   User,
-  iconStroke,
-} from "../../lib/icons";
+  iconStroke } from "../../lib/icons";
 import type { FootballProfile } from "../../lib/perfil";
 import { listUsuariosBloqueados, desbloquearUsuario, type BloqueadoItem } from "../../lib/moderacion";
 import { RelojSimulacionCard } from "./RelojSimulacionCard";
@@ -27,8 +26,7 @@ import {
   NOTIF_TIPOS,
   listPreferenciasNotificacion,
   setPreferenciaNotificacion,
-  type NotifTipo,
-} from "../../lib/notificaciones";
+  type NotifTipo } from "../../lib/notificaciones";
 import { Button, Card, Chip, IconBtn, Mute, showConfirm, showNotice } from "../../ui";
 import { typeStyle } from "../../ui/textStyle";
 import { fontFamily } from "../../lib/fonts";
@@ -36,7 +34,6 @@ import { fontFamily } from "../../lib/fonts";
 const TERMINOS = "https://porlacancha.com/terminos";
 const PRIVACIDAD = "https://porlacancha.com/privacidad";
 const SOPORTE = "https://porlacancha.com/soporte";
-const fondoAzul3 = require("../../../assets/fondo-azul-3.jpeg");
 
 type Panel = "home" | "privacy" | "security" | "password" | "notifications" | "blocked";
 
@@ -57,8 +54,7 @@ function Row({
   onPress,
   icon,
   disabled,
-  trailing,
-}: {
+  trailing }: {
   label: string;
   value?: string;
   onPress?: () => void;
@@ -92,8 +88,7 @@ export function ConfiguracionScreen({
   onEdit,
   onDatosPersonales,
   onPublic,
-  onSignOut,
-}: Props) {
+  onSignOut }: Props) {
   const insets = useSafeAreaInsets();
   const [panel, setPanel] = useState<Panel>("home");
   const [sheet, setSheet] = useState(false);
@@ -154,8 +149,7 @@ export function ConfiguracionScreen({
           }
           void onSignOut();
         });
-      },
-    });
+      } });
   };
 
   const title =
@@ -184,7 +178,7 @@ export function ConfiguracionScreen({
   };
 
   return (
-    <ImageBackground source={fondoAzul3} style={styles.fill} resizeMode="cover">
+    <View style={[styles.fill, { backgroundColor: colors.navy }]}>
       <View style={[styles.bar, { paddingTop: Math.max(insets.top, space[8]) }]}>
         <IconBtn onPress={goBack} label="Volver">
           <ChevronLeft color={colors.gold} size={22} strokeWidth={iconStroke} />
@@ -393,7 +387,7 @@ export function ConfiguracionScreen({
           <Button label="Cerrar sesión" variant="danger" onPress={logout} />
         </View>
       </Modal>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -410,8 +404,7 @@ const styles = StyleSheet.create({
     gap: space[12],
     paddingVertical: space[8],
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
+    borderBottomColor: colors.border },
   lab: typeStyle("bodySmall", colors.textSecondary),
   val: typeStyle("body", colors.white),
   prefRow: {
@@ -421,8 +414,7 @@ const styles = StyleSheet.create({
     gap: space[12],
     paddingVertical: space[8],
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
+    borderBottomColor: colors.border },
   prefLab: { ...typeStyle("body", colors.white), flex: 1 },
   secA: typeStyle("bodySmall", colors.gold),
   logout: {
@@ -435,8 +427,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: space[8],
-  },
+    gap: space[8] },
   logoutT: typeStyle("h3", colors.danger),
   deleteRow: { minHeight: 48, justifyContent: "center", marginTop: space[8] },
   deleteT: typeStyle("bodySmall", colors.danger),
@@ -450,15 +441,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[16],
     color: colors.white,
     fontFamily: fontFamily.ui,
-    fontSize: 16,
-  },
+    fontSize: 16 },
   dim: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },
   sheet: {
     backgroundColor: colors.navyDark,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
-    padding: space[20],
-  },
+    padding: space[20] },
   sheetH: typeStyle("h2", colors.white),
-  sheetP: { ...typeStyle("bodySmall", colors.textSecondary), marginVertical: space[12] },
-});
+  sheetP: { ...typeStyle("bodySmall", colors.textSecondary), marginVertical: space[12] } });

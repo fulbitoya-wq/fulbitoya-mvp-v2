@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  FlatList,
-  ImageBackground,
+  FlatList, 
   Pressable,
   RefreshControl,
   ScrollView,
@@ -36,7 +35,6 @@ import { InicioQuickActions } from "./InicioQuickActions";
 import { InicioUpcomingMatchCard, InicioUpcomingReservaCard } from "./InicioUpcomingCard";
 import { InicioVenueCard } from "./InicioVenueCard";
 
-const fondoAzul = require("../../../assets/fondo-azul.jpeg");
 
 type WhenFilter = "hoy" | "manana" | "finde" | "todos";
 type TipoFilter = "todos" | "f5" | "f7" | "f9" | "f11";
@@ -91,8 +89,7 @@ export function InicioScreen({
   onReservarTurno,
   onOpenPredio,
   onRequestAuth,
-  onOpenZona,
-}: Props) {
+  onOpenZona }: Props) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { profile } = useAuth();
@@ -188,8 +185,7 @@ export function InicioScreen({
         tipos: new Set<string>(),
         superficies: new Set<string>(),
         techada: false,
-        hours: [],
-      };
+        hours: [] };
       if (!cur.direccion && t.direccion) cur.direccion = t.direccion;
       if (!cur.barrio && t.barrio) cur.barrio = t.barrio;
       if (cur.lat == null && t.lat != null) cur.lat = t.lat;
@@ -231,8 +227,7 @@ export function InicioScreen({
           distancia: formatDistanciaKm(km),
           km,
           detalles: detallesParts.join(" · "),
-          hours: [...v.hours].sort((a, b) => a.hora.localeCompare(b.hora)),
-        };
+          hours: [...v.hours].sort((a, b) => a.hora.localeCompare(b.hora)) };
       });
 
     ranked.sort((a, b) => {
@@ -257,7 +252,7 @@ export function InicioScreen({
   const toggleWhen = (v: WhenFilter) => setWhen((cur) => (cur === v ? "todos" : v));
 
   return (
-    <ImageBackground source={fondoAzul} style={styles.fill} resizeMode="cover">
+    <View style={[styles.fill, { backgroundColor: colors.navy }]}>
       <LinearGradient colors={["rgba(0,27,68,0.35)", colors.navyDark]} style={StyleSheet.absoluteFill} />
       <ScrollView
         style={styles.fill}
@@ -265,8 +260,7 @@ export function InicioScreen({
           paddingTop: Math.max(insets.top, space[12]),
           paddingHorizontal: 16,
           paddingBottom: TAB_BAR_CONTENT_INSET,
-          gap: space[16],
-        }}
+          gap: space[16] }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void pull()} tintColor={colors.gold} />}
       >
         {guest ? (
@@ -421,7 +415,7 @@ export function InicioScreen({
           </Pressable>
         ) : null}
       </ScrollView>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -438,8 +432,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(139,201,235,0.30)",
     borderRadius: 22,
     padding: space[16],
-    gap: space[10],
-  },
+    gap: space[10] },
   welcome: typeStyle("h2", colors.white),
   welcomeGold: { color: colors.gold },
   welcomeP: typeStyle("bodySmall", colors.textSecondary),
@@ -453,8 +446,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(139,201,235,0.55)",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 16,
-  },
+    paddingHorizontal: 16 },
   ghostBtnT: typeStyle("bodySmall", colors.white),
   empty: { gap: 8, paddingVertical: space[8] },
   emptyT: typeStyle("body", colors.white),
@@ -471,8 +463,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(139,201,235,0.30)",
     borderRadius: 18,
-    padding: space[12],
-  },
+    padding: space[12] },
   inviteT: typeStyle("h3", colors.white),
   inviteP: typeStyle("caption", colors.textSecondary),
   inviteCta: {
@@ -481,7 +472,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gold,
     borderRadius: 12,
     paddingHorizontal: 10,
-    height: 36,
-  },
-  inviteCtaT: typeStyle("caption", colors.navyDark),
-});
+    height: 36 },
+  inviteCtaT: typeStyle("caption", colors.navyDark) });

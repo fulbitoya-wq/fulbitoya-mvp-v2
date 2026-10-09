@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Image,
-  ImageBackground,
+  Image, 
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,8 +14,7 @@ import {
   crearEquipoSchema,
   mensajeErrorEquipo,
   rpcCrearEquipo,
-  type MatchFormato,
-} from "@shared/equipos";
+  type MatchFormato } from "@shared/equipos";
 import { firstZodError } from "@shared/validation/auth";
 import { useAuth } from "../../auth/AuthProvider";
 import { listLocalidades, listPartidos, listProvincias } from "../../lib/equipos";
@@ -25,7 +23,6 @@ import { showNotice, TAB_BAR_CONTENT_INSET } from "../../ui";
 
 const FORMATOS: MatchFormato[] = ["f5", "f7", "f9", "f11"];
 const BUCKET = "equipo-logos";
-const fondoAzul3 = require("../../../assets/fondo-azul-3.jpeg");
 
 type Lugar = { id: string; nombre: string };
 
@@ -80,8 +77,7 @@ export function CrearEquipoScreen({ onBack, onCreated }: Props) {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      quality: 0.8,
-    });
+      quality: 0.8 });
     if (!result.canceled && result.assets[0]?.uri) {
       setEscudoUri(result.assets[0].uri);
     }
@@ -94,8 +90,7 @@ export function CrearEquipoScreen({ onBack, onCreated }: Props) {
     const body = await response.arrayBuffer();
     const { data, error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, body, {
       contentType: "image/jpeg",
-      upsert: false,
-    });
+      upsert: false });
     if (uploadErr) throw new Error(uploadErr.message);
     const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(data.path);
     return urlData.publicUrl;
@@ -108,8 +103,7 @@ export function CrearEquipoScreen({ onBack, onCreated }: Props) {
       formato_habitual: formato,
       provincia_id: provinciaId,
       partido_id: partidoId,
-      localidad_id: localidadId,
-    });
+      localidad_id: localidadId });
     if (!parsed.success) {
       setError(firstZodError(parsed.error));
       return;
@@ -119,8 +113,7 @@ export function CrearEquipoScreen({ onBack, onCreated }: Props) {
       const escudo_url = await uploadCrest();
       const res = await rpcCrearEquipo(supabase, {
         ...parsed.data,
-        escudo_url,
-      });
+        escudo_url });
       if (!res.ok) {
         setError(mensajeErrorEquipo(res.error));
         return;
@@ -134,7 +127,7 @@ export function CrearEquipoScreen({ onBack, onCreated }: Props) {
   };
 
   return (
-    <ImageBackground source={fondoAzul3} style={styles.page} resizeMode="cover">
+    <View style={[styles.page, { backgroundColor: colors.navy }]}>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Pressable onPress={onBack}>
         <Text style={styles.back}>← Volver</Text>
@@ -187,7 +180,7 @@ export function CrearEquipoScreen({ onBack, onCreated }: Props) {
         <Text style={styles.ctaTxt}>{loading ? "Creando..." : "Crear equipo"}</Text>
       </Pressable>
     </ScrollView>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -195,8 +188,7 @@ function ChipList({
   items,
   selected,
   onSelect,
-  empty,
-}: {
+  empty }: {
   items: Lugar[];
   selected: string | null;
   onSelect: (id: string) => void;
@@ -236,16 +228,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: colors.white,
     borderWidth: 1,
-    borderColor: colors.border,
-  },
+    borderColor: colors.border },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
   chip: {
     borderWidth: 1,
     borderColor: colors.borderStrong,
     borderRadius: 999,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
+    paddingVertical: 8 },
   chipOn: { backgroundColor: colors.gold, borderColor: colors.gold },
   chipTxt: { fontWeight: "700", color: colors.white, fontSize: 12 },
   chipTxtOn: { color: colors.navyDark },
@@ -254,8 +244,7 @@ const styles = StyleSheet.create({
     borderColor: colors.borderStrong,
     borderRadius: 12,
     paddingVertical: 12,
-    alignItems: "center",
-  },
+    alignItems: "center" },
   ghostTxt: { fontWeight: "700", color: colors.white },
   preview: { width: 72, height: 72, borderRadius: 36, marginTop: 10 },
   cta: {
@@ -263,7 +252,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
-    marginTop: 22,
-  },
-  ctaTxt: { color: colors.navyDark, fontWeight: "800" },
-});
+    marginTop: 22 },
+  ctaTxt: { color: colors.navyDark, fontWeight: "800" } });
