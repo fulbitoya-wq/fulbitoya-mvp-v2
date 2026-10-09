@@ -6,7 +6,7 @@ import { colors, radius, space } from "@shared/design";
 import { rpcInvitarSinCuenta } from "@shared/equipos";
 import type { EquipoListItem, MiembroPlantel } from "../lib/equipos";
 import { getEquipoDetalle } from "../lib/equipos";
-import { etiquetaTipo, formatFechaCorta, formatHora, minimoConvocados, normalizarTipo } from "../lib/desafios";
+import { etiquetaTipo, formatHora, minimoConvocados, normalizarTipo } from "../lib/desafios";
 import {
   calcularCondiciones,
   confirmarPagoPrueba,
@@ -474,6 +474,9 @@ export function CrearPartidoScreen({
     !!equipoId &&
     selected.length >= 1;
 
+  const lugarListo =
+    origen === "fulbitoya" ? !!turnoId : !!placeCanchaId && !!fecha && !!hora;
+
   return (
     <View style={styles.fill}>
       <View style={[styles.bar, { paddingTop: Math.max(insets.top, space[8]) }]}>
@@ -484,62 +487,7 @@ export function CrearPartidoScreen({
         <View style={{ width: 48 }} />
       </View>
       <ScrollView contentContainerStyle={{ padding: space[16], paddingBottom: insets.bottom + space[40] }}>
-        <Text style={styles.h}>Tu equipo</Text>
-        <View style={styles.rowWrap}>
-          {(
-            [
-              ["equipo", "Elegir equipo"],
-              ["nuevo", "Crear equipo"],
-              ...(modalidad === "por_la_cancha" ? [] : [["sin_equipo", "Sin equipo"] as const]),
-            ] as const
-          ).map(([k, label]) => (
-            <Pressable
-              key={k}
-              onPress={() => setEquipoModo(k)}
-              style={[styles.chip, equipoModo === k && styles.chipOn]}
-            >
-              <Text style={styles.chipT}>{label}</Text>
-            </Pressable>
-          ))}
-        </View>
-        {equipoModo === "equipo" ? (
-          captainTeams.length === 0 ? (
-            <EmptyState
-              title="Todavía no sos capitán"
-              body={
-                modalidad === "por_la_cancha"
-                  ? "Para por la cancha necesitás un equipo. Creá uno con un nombre."
-                  : "Creá un equipo con un nombre o jugá sin equipo."
-              }
-              action={<Button label="Crear equipo" onPress={() => setEquipoModo("nuevo")} />}
-            />
-          ) : (
-            captainTeams.map((t) => (
-              <Pressable
-                key={t.id}
-                onPress={() => setEquipoId(t.id)}
-                style={[styles.card, equipoId === t.id && styles.cardOn]}
-              >
-                <Text style={styles.body}>{t.nombre}</Text>
-                <Mute>{etiquetaTipo(t.formato_habitual ?? "f5")}</Mute>
-              </Pressable>
-            ))
-          )
-        ) : null}
-        {equipoModo === "nuevo" ? (
-          <TextInput
-            value={nuevoNombre}
-            onChangeText={setNuevoNombre}
-            placeholder="Nombre del equipo"
-            placeholderTextColor={colors.textSecondary}
-            style={styles.input}
-          />
-        ) : null}
-        {equipoModo === "sin_equipo" && modalidad !== "por_la_cancha" ? (
-          <Mute>Jugás sin equipo. Podés sumar gente después; en cancha no adherida el partido es gratis.</Mute>
-        ) : null}
-
-        <Text style={[styles.h, { marginTop: space[16] }]}>Modalidad</Text>
+        <Text style={styles.h}>Modalidad</Text>
         <View style={styles.rowWrap}>
           {(["amistoso", "competitivo", "por_la_cancha"] as const).map((m) => (
             <Pressable
@@ -556,13 +504,9 @@ export function CrearPartidoScreen({
             </Pressable>
           ))}
         </View>
-        <Mute>
-          {modalidad === "por_la_cancha"
-            ? "Cada lado paga la cancha de anticipado más la tarifa. Necesitás un equipo. Si ganan, el depósito se le reembolsa al capitán."
-            : origen === "places" && !placeAdherido
-              ? "Gratis en la app. Los que se suman pagan en el lugar. Etiqueta: Cancha no adherida."
-              : "Partido abierto. En predio adherido puede haber tarifa Plus según el turno."}
-        </Mute>
+        {modalidad === "por_la_cancha" ? (
+          <Mute>Cada lado deja la cancha. Gana = se le reembolsa al capitán.</Mute>
+        ) : null}
 
         <Text style={[styles.h, { marginTop: space[16] }]}>¿Dónde juegan?</Text>
         <View style={styles.origenRow}>
@@ -576,7 +520,7 @@ export function CrearPartidoScreen({
             style={[styles.origenCard, origen === "fulbitoya" && styles.origenCardOn]}
           >
             <Text style={styles.origenTitle}>Nuestras canchas</Text>
-            <Text style={styles.origenSub}>Reservá y pagá en la app</Text>
+            <Text style={styles.origenSub}>Elegí predio, día y hora</Text>
           </Pressable>
           <Pressable
             onPress={() => {
@@ -587,8 +531,8 @@ export function CrearPartidoScreen({
             }}
             style={[styles.origenCard, origen === "places" && styles.origenCardOn]}
           >
-            <Text style={styles.origenTitle}>Agregar cancha</Text>
-            <Text style={styles.origenSub}>Una cancha que ya tenés alquilada</Text>
+            <Text style={styles.origenTitle}>Ya la reservé</Text>
+            <Text style={styles.origenSub}>Tenés cancha afuera de la app</Text>
           </Pressable>
         </View>
 
@@ -596,10 +540,10 @@ export function CrearPartidoScreen({
           <>
             {loadErr ? <Mute>{loadErr}</Mute> : null}
             {prediosFy.length === 0 ? (
-              <Mute>{`No hay turnos libres para ${etiquetaTipo(formato)}. Probá agregar una cancha.`}</Mute>
+              <Mute>{`No hay turnos libres para ${etiquetaTipo(formato)}. Probá “Ya la reservé”.`}</Mute>
             ) : !predioId ? (
               <>
-                <Mute>Elegí un predio</Mute>
+                <Text style={[styles.h, { marginTop: space[12] }]}>Predio</Text>
                 {prediosFy.map((p) => (
                   <Pressable
                     key={p.id}
@@ -626,9 +570,10 @@ export function CrearPartidoScreen({
                     setDiaId(null);
                     setTurnoId(null);
                   }}
+                  style={{ marginTop: space[8] }}
                 >
                   <Mute>
-                    {`← ${prediosFy.find((p) => p.id === predioId)?.nombre ?? "Predio"} · cambiar predio`}
+                    {`← ${prediosFy.find((p) => p.id === predioId)?.nombre ?? "Predio"} · cambiar`}
                   </Mute>
                 </Pressable>
 
@@ -658,9 +603,9 @@ export function CrearPartidoScreen({
                   })}
                 </ScrollView>
 
-                <Text style={[styles.h, { marginTop: space[12] }]}>Horarios</Text>
+                <Text style={[styles.h, { marginTop: space[12] }]}>Hora</Text>
                 {horasFy.length === 0 ? (
-                  <Mute>No hay horarios libres este día. Probá otro.</Mute>
+                  <Mute>Sin horarios este día. Probá otro.</Mute>
                 ) : (
                   <View style={styles.hoursGrid}>
                     {horasFy.map((t) => {
@@ -691,7 +636,7 @@ export function CrearPartidoScreen({
         ) : (
           <>
             {placeCanchaId ? (
-              <View style={styles.cardOn}>
+              <View style={[styles.cardOn, { marginTop: space[12] }]}>
                 <Text style={styles.body}>{placeLabel}</Text>
                 <Mute>{placeAdherido ? "Cancha en la app" : "Cancha no adherida"}</Mute>
                 <Pressable
@@ -704,7 +649,9 @@ export function CrearPartidoScreen({
                 </Pressable>
               </View>
             ) : (
-              <PlacesSearch onConfirmed={(p) => void onPlaceConfirmed(p)} />
+              <View style={{ marginTop: space[12] }}>
+                <PlacesSearch onConfirmed={(p) => void onPlaceConfirmed(p)} />
+              </View>
             )}
             {placeCanchaId ? (
               <>
@@ -729,7 +676,7 @@ export function CrearPartidoScreen({
                     </Pressable>
                   ))}
                 </View>
-                <Text style={[styles.h, { marginTop: space[16] }]}>Precio de la cancha (en el lugar)</Text>
+                <Text style={[styles.h, { marginTop: space[16] }]}>Precio (en el lugar)</Text>
                 <TextInput
                   value={precioCancha}
                   onChangeText={setPrecioCancha}
@@ -803,9 +750,8 @@ export function CrearPartidoScreen({
         {condErr ? <Text style={styles.err}>{condErr}</Text> : null}
         {cotDep && cotDep.ok !== false ? (
           <View style={{ marginTop: space[12], gap: space[4] }}>
-            <Text style={styles.h}>Desglose</Text>
             <Mute>
-              {`Cancha ${pesos(cotDep.precio_cancha)} · Tarifa ${pesos(cotDep.tarifa)} · Total por equipo ${pesos(
+              {`Cancha ${pesos(cotDep.precio_cancha)} · Tarifa ${pesos(cotDep.tarifa)} · Total ${pesos(
                 cotDep.total_equipo
               )}`}
             </Mute>
@@ -814,43 +760,98 @@ export function CrearPartidoScreen({
               <Text style={styles.body}>
                 {typeof cotDep.texto_tarifa === "string"
                   ? cotDep.texto_tarifa
-                  : "La tarifa cubre el procesamiento del pago y no se reembolsa en ningún caso."}
+                  : "La tarifa no se reembolsa."}
               </Text>
             </Pressable>
           </View>
         ) : null}
         {cond && cond.ok !== false && !esDeposito ? (
           <View style={{ marginTop: space[12], gap: space[4] }}>
-            <Text style={styles.h}>Condiciones</Text>
             <Mute>{typeof cond.mensaje_tramo === "string" ? cond.mensaje_tramo : ""}</Mute>
             <Mute>{`Cancha ${pesos(cond.precio_cancha)} · tu equipo ${pesos(cond.monto_equipo_a)}`}</Mute>
           </View>
         ) : null}
 
-        <Text style={[styles.h, { marginTop: space[16] }]}>Si empatan</Text>
-        <View style={styles.rowWrap}>
-          <Pressable onPress={() => setRegla("penales")} style={[styles.chip, regla === "penales" && styles.chipOn]}>
-            <Text style={styles.chipT}>Penales</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setRegla("mitad_cada_uno")}
-            style={[styles.chip, regla === "mitad_cada_uno" && styles.chipOn]}
-          >
-            <Text style={styles.chipT}>Mitad de cancha cada uno</Text>
-          </Pressable>
-        </View>
-
-        {equipoModo !== "sin_equipo" ? (
+        {lugarListo ? (
           <>
-            <Text style={[styles.h, { marginTop: space[16] }]}>Tu lado</Text>
-            <Mute>
-              {`Para publicar alcanza con el capitán. Sumá jugadores con cuenta, invitados por nombre o dejá lugares libres (${min} cupos). En por la cancha, si un lado está incompleto a la hora del partido, cuenta como walkover.`}
-            </Mute>
-            {conCuenta.length > 0 ? (
+            <Text style={[styles.h, { marginTop: space[20] }]}>Tu equipo</Text>
+            <View style={styles.rowWrap}>
+              {(
+                [
+                  ["equipo", "Elegir equipo"],
+                  ["nuevo", "Crear equipo"],
+                  ...(modalidad === "por_la_cancha" ? [] : [["sin_equipo", "Sin equipo"] as const]),
+                ] as const
+              ).map(([k, label]) => (
+                <Pressable
+                  key={k}
+                  onPress={() => setEquipoModo(k)}
+                  style={[styles.chip, equipoModo === k && styles.chipOn]}
+                >
+                  <Text style={styles.chipT}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            {equipoModo === "equipo" ? (
+              captainTeams.length === 0 ? (
+                <EmptyState
+                  title="Todavía no sos capitán"
+                  body={
+                    modalidad === "por_la_cancha"
+                      ? "Creá un equipo con un nombre."
+                      : "Creá un equipo o jugá sin equipo."
+                  }
+                  action={<Button label="Crear equipo" onPress={() => setEquipoModo("nuevo")} />}
+                />
+              ) : (
+                captainTeams.map((t) => (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => setEquipoId(t.id)}
+                    style={[styles.card, equipoId === t.id && styles.cardOn]}
+                  >
+                    <Text style={styles.body}>{t.nombre}</Text>
+                    <Mute>{etiquetaTipo(t.formato_habitual ?? "f5")}</Mute>
+                  </Pressable>
+                ))
+              )
+            ) : null}
+            {equipoModo === "nuevo" ? (
+              <TextInput
+                value={nuevoNombre}
+                onChangeText={setNuevoNombre}
+                placeholder="Nombre del equipo"
+                placeholderTextColor={colors.textSecondary}
+                style={styles.input}
+              />
+            ) : null}
+
+            {modalidad === "por_la_cancha" ? (
               <>
-                <Text style={[styles.h, { marginTop: space[12] }]}>
+                <Text style={[styles.h, { marginTop: space[16] }]}>Si empatan</Text>
+                <View style={styles.rowWrap}>
+                  <Pressable
+                    onPress={() => setRegla("penales")}
+                    style={[styles.chip, regla === "penales" && styles.chipOn]}
+                  >
+                    <Text style={styles.chipT}>Penales</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setRegla("mitad_cada_uno")}
+                    style={[styles.chip, regla === "mitad_cada_uno" && styles.chipOn]}
+                  >
+                    <Text style={styles.chipT}>Mitad cada uno</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+
+            {equipoModo !== "sin_equipo" ? (
+              <>
+                <Text style={[styles.h, { marginTop: space[16] }]}>
                   Convocados ({selected.length}/{min})
                 </Text>
+                <Mute>Con el capitán alcanza para publicar.</Mute>
                 {conCuenta.map((m) => {
                   const uid = m.usuario_id!;
                   const on = picked.has(uid);
@@ -864,64 +865,61 @@ export function CrearPartidoScreen({
                     </Pressable>
                   );
                 })}
+                {invitados.map((m) => (
+                  <View key={m.miembro_id} style={styles.row}>
+                    <View style={[styles.box, styles.boxOn]} />
+                    <Text style={styles.body}>{m.invitado_nombre || m.nombre || "Invitado"} · Sin cuenta</Text>
+                  </View>
+                ))}
+                {cuposLibres > 0 ? (
+                  <Mute>{cuposLibres === 1 ? "1 lugar libre" : `${cuposLibres} lugares libres`}</Mute>
+                ) : null}
+                <TextInput
+                  value={invitadoNombre}
+                  onChangeText={setInvitadoNombre}
+                  placeholder="Invitado (solo nombre)"
+                  placeholderTextColor={colors.textSecondary}
+                  style={[styles.input, { marginTop: space[8] }]}
+                />
+                <View style={{ marginTop: space[8] }}>
+                  <Button
+                    label={invitando ? "Agregando..." : "Agregar invitado"}
+                    onPress={() => void agregarInvitado()}
+                    variant="ghost"
+                    disabled={invitando || busy}
+                    loading={invitando}
+                  />
+                </View>
               </>
             ) : null}
-            {invitados.map((m) => (
-              <View key={m.miembro_id} style={styles.row}>
-                <View style={[styles.box, styles.boxOn]} />
-                <Text style={styles.body}>{m.invitado_nombre || m.nombre || "Invitado"} · Sin cuenta</Text>
-              </View>
-            ))}
-            {cuposLibres > 0 ? (
+
+            {equipoModo === "equipo" && equipoId ? (
               <View style={{ marginTop: space[8] }}>
-                <Mute>{cuposLibres === 1 ? "1 lugar libre" : `${cuposLibres} lugares libres`}</Mute>
+                <Button label="Ir a Equipos" onPress={onCreateTeam} variant="ghost" />
               </View>
             ) : null}
-            <Text style={[styles.h, { marginTop: space[12] }]}>Invitado (solo nombre)</Text>
-            <TextInput
-              value={invitadoNombre}
-              onChangeText={setInvitadoNombre}
-              placeholder="Ej: Nico"
-              placeholderTextColor={colors.textSecondary}
-              style={styles.input}
-            />
-            <View style={{ marginTop: space[8] }}>
+
+            <View style={{ marginTop: space[24] }}>
               <Button
-                label={invitando ? "Agregando..." : "Agregar invitado"}
-                onPress={() => void agregarInvitado()}
-                variant="ghost"
-                disabled={invitando || busy}
-                loading={invitando}
+                label={
+                  busy
+                    ? "Publicando..."
+                    : esLibrePlaces
+                      ? "Publicar partido gratis"
+                      : esDeposito
+                        ? "Publicar y pagar"
+                        : "Publicar y continuar al pago"
+                }
+                onPress={() => void publicar()}
+                disabled={
+                  busy ||
+                  (esLibrePlaces ? !canPublishLibre : esDeposito ? !canPublishDeposito : !canPublishPlus)
+                }
+                loading={busy}
               />
             </View>
           </>
         ) : null}
-
-        {equipoModo === "equipo" && equipoId ? (
-          <View style={{ marginTop: space[12] }}>
-            <Button label="Ir a la sección Equipos" onPress={onCreateTeam} variant="ghost" />
-          </View>
-        ) : null}
-
-        <View style={{ marginTop: space[24] }}>
-          <Button
-            label={
-              busy
-                ? "Publicando..."
-                : esLibrePlaces
-                  ? "Publicar partido gratis"
-                    : esDeposito
-                    ? "Publicar y pagar"
-                    : "Publicar y continuar al pago"
-            }
-            onPress={() => void publicar()}
-            disabled={
-              busy ||
-              (esLibrePlaces ? !canPublishLibre : esDeposito ? !canPublishDeposito : !canPublishPlus)
-            }
-            loading={busy}
-          />
-        </View>
       </ScrollView>
 
       {pagoCrear ? (
@@ -1055,4 +1053,35 @@ const styles = StyleSheet.create({
     marginTop: space[8],
     ...typeStyle("body", colors.white),
   },
+  dayRow: { gap: space[8], paddingVertical: space[4] },
+  dayChip: {
+    minWidth: 72,
+    paddingHorizontal: space[12],
+    paddingVertical: space[10],
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: "rgba(139,201,235,0.30)",
+    backgroundColor: colors.surface,
+    alignItems: "center",
+  },
+  dayOn: { borderColor: colors.gold, backgroundColor: colors.surfaceHover },
+  dayEmpty: { opacity: 0.55 },
+  dayT: typeStyle("bodySmall", colors.white),
+  dayTOn: { color: colors.gold },
+  hoursGrid: { flexDirection: "row", flexWrap: "wrap", gap: space[8], marginTop: space[4] },
+  hourChip: {
+    minWidth: 88,
+    minHeight: 56,
+    paddingHorizontal: space[12],
+    paddingVertical: space[8],
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "rgba(139,201,235,0.45)",
+    backgroundColor: colors.navyDark,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  hourOn: { borderColor: colors.gold, borderWidth: 2, backgroundColor: colors.surfaceHover },
+  hourH: typeStyle("body", colors.white),
+  hourP: typeStyle("caption", colors.textSecondary),
 });
