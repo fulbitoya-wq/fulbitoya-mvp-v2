@@ -69,6 +69,8 @@ export function CrearPartidoScreen({
   const [regla, setRegla] = useState<PlcReglaEmpate>("penales");
   const [origen, setOrigen] = useState<OrigenCancha>("fulbitoya");
   const [turnos, setTurnos] = useState<TurnoPublico[]>([]);
+  const [predioId, setPredioId] = useState<string | null>(null);
+  const [diaId, setDiaId] = useState<string | null>(null);
   const [turnoId, setTurnoId] = useState<string | null>(null);
   const [placeCanchaId, setPlaceCanchaId] = useState<string | null>(null);
   const [placeLabel, setPlaceLabel] = useState<string | null>(null);
@@ -141,6 +143,48 @@ export function CrearPartidoScreen({
     () => turnos.filter((t) => normalizarTipo(t.campo_tipo) === normalizarTipo(formato)),
     [turnos, formato]
   );
+
+  const prediosFy = useMemo(() => {
+    const by: Record<
+      string,
+      { id: string; nombre: string; barrio: string | null; nTurnos: number }
+    > = {};
+    for (const t of turnosFmt) {
+      const cur = by[t.cancha_id] ?? {
+        id: t.cancha_id,
+        nombre: t.cancha_nombre,
+        barrio: t.barrio,
+        nTurnos: 0,
+      };
+      if (!cur.barrio && t.barrio) cur.barrio = t.barrio;
+      cur.nTurnos += 1;
+      by[t.cancha_id] = cur;
+    }
+    return Object.values(by).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }, [turnosFmt]);
+
+  const diasFy = useMemo(() => {
+    if (!predioId) return [] as string[];
+    const set = new Set<string>();
+    for (const t of turnosFmt) {
+      if (t.cancha_id === predioId) set.add(t.fecha);
+    }
+    return [...set].sort();
+  }, [turnosFmt, predioId]);
+
+  const horasFy = useMemo(() => {
+    if (!predioId || !diaId) return [] as TurnoPublico[];
+    return turnosFmt
+      .filter((t) => t.cancha_id === predioId && t.fecha === diaId)
+      .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
+  }, [turnosFmt, predioId, diaId]);
+
+  useEffect(() => {
+    // Si cambia el formato, reseteamos la cascada de predio/día/hora.
+    setPredioId(null);
+    setDiaId(null);
+    setTurnoId(null);
+  }, [formato]);
 
   useEffect(() => {
     if (!turnoId || origen !== "fulbitoya" || modalidad === "por_la_cancha") {
@@ -512,14 +556,24 @@ export function CrearPartidoScreen({
         <Text style={[styles.h, { marginTop: space[16] }]}>¿Dónde juegan?</Text>
         <View style={styles.origenRow}>
           <Pressable
-            onPress={() => setOrigen("fulbitoya")}
+            onPress={() => {
+              setOrigen("fulbitoya");
+              setPredioId(null);
+              setDiaId(null);
+              setTurnoId(null);
+            }}
             style={[styles.origenCard, origen === "fulbitoya" && styles.origenCardOn]}
           >
             <Text style={styles.origenTitle}>Nuestras canchas</Text>
             <Text style={styles.origenSub}>Reservá y pagá en la app</Text>
           </Pressable>
           <Pressable
-            onPress={() => setOrigen("places")}
+            onPress={() => {
+              setOrigen("places");
+              setPredioId(null);
+              setDiaId(null);
+              setTurnoId(null);
+            }}
             style={[styles.origenCard, origen === "places" && styles.origenCardOn]}
           >
             <Text style={styles.origenTitle}>Agregar cancha</Text>
@@ -530,29 +584,87 @@ export function CrearPartidoScreen({
         {origen === "fulbitoya" ? (
           <>
             {loadErr ? <Mute>{loadErr}</Mute> : null}
-            {turnosFmt.length === 0 ? (
+            {prediosFy.length === 0 ? (
               <Mute>{`No hay turnos libres para ${etiquetaTipo(formato)}. Probá agregar una cancha.`}</Mute>
-            ) : (
-              turnosFmt.slice(0, 40).map((t) => (
+            ) : !predioId ? (
+              <>
+                <Mute>Elegí un predio</Mute>
+                {prediosFy.map((p) => (
+                  <Pressable
+                    key={p.id}
+                    onPress={() => {
+                      setPredioId(p.id);
+                      setDiaId(null);
+                      setTurnoId(null);
+                    }}
+                    style={styles.card}
+                  >
+                    <Text style={styles.body}>
+                      {p.nombre}
+                      {p.barrio ? ` · ${p.barrio}` : ""}
+                    </Text>
+                    <Mute>{`${p.nTurnos} turno${p.nTurnos === 1 ? "" : "s"} libre${p.nTurnos === 1 ? "" : "s"}`}</Mute>
+                  </Pressable>
+                ))}
+              </>
+            ) : !diaId ? (
+              <>
                 <Pressable
-                  key={t.id}
                   onPress={() => {
-                    setTurnoId(t.id);
-                    if (t.precio != null) setPrecioCancha(String(Math.round(t.precio)));
+                    setPredioId(null);
+                    setDiaId(null);
+                    setTurnoId(null);
                   }}
-                  style={[styles.card, turnoId === t.id && styles.cardOn]}
                 >
-                  <Text style={styles.body}>
-                    {t.cancha_nombre}
-                    {t.barrio ? ` · ${t.barrio}` : ""}
-                  </Text>
                   <Mute>
-                    {`${t.campo_nombre} · ${formatFechaCorta(t.fecha)} · ${formatHora(t.hora_inicio)}${
-                      t.precio != null ? ` · ${pesos(t.precio)}` : ""
-                    }`}
+                    {`← ${prediosFy.find((p) => p.id === predioId)?.nombre ?? "Predio"} · cambiar predio`}
                   </Mute>
                 </Pressable>
-              ))
+                <Text style={[styles.h, { marginTop: space[8] }]}>Día</Text>
+                {diasFy.map((f) => (
+                  <Pressable
+                    key={f}
+                    onPress={() => {
+                      setDiaId(f);
+                      setTurnoId(null);
+                    }}
+                    style={styles.card}
+                  >
+                    <Text style={styles.body}>{formatFechaCorta(f)}</Text>
+                    <Mute>
+                      {`${turnosFmt.filter((t) => t.cancha_id === predioId && t.fecha === f).length} horarios`}
+                    </Mute>
+                  </Pressable>
+                ))}
+              </>
+            ) : (
+              <>
+                <Pressable
+                  onPress={() => {
+                    setDiaId(null);
+                    setTurnoId(null);
+                  }}
+                >
+                  <Mute>{`← ${formatFechaCorta(diaId)} · cambiar día`}</Mute>
+                </Pressable>
+                <Text style={[styles.h, { marginTop: space[8] }]}>Horario</Text>
+                {horasFy.map((t) => (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => {
+                      setTurnoId(t.id);
+                      if (t.precio != null) setPrecioCancha(String(Math.round(t.precio)));
+                    }}
+                    style={[styles.card, turnoId === t.id && styles.cardOn]}
+                  >
+                    <Text style={styles.body}>
+                      {formatHora(t.hora_inicio)}
+                      {t.precio != null ? ` · ${pesos(t.precio)}` : ""}
+                    </Text>
+                    <Mute>{`${t.campo_nombre} · ${etiquetaTipo(t.campo_tipo)}`}</Mute>
+                  </Pressable>
+                ))}
+              </>
             )}
           </>
         ) : (
