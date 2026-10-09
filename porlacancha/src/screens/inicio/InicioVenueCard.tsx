@@ -32,14 +32,23 @@ export function InicioVenueCard({
 
   return (
     <View style={styles.card}>
+      {/* Imagen al borde izquierdo, alto = toda la card */}
       <Pressable
         onPress={onPressVenue}
         disabled={!onPressVenue}
         accessibilityRole={onPressVenue ? "button" : undefined}
-        style={styles.mainHit}
+        style={styles.photoHit}
       >
         <Image source={source} style={styles.photo} resizeMode="cover" />
-        <View style={styles.bodyTop}>
+      </Pressable>
+
+      <View style={styles.content}>
+        <Pressable
+          onPress={onPressVenue}
+          disabled={!onPressVenue}
+          accessibilityRole={onPressVenue ? "button" : undefined}
+          style={styles.bodyTop}
+        >
           <View style={styles.titleRow}>
             <Text style={styles.name} numberOfLines={1}>
               {nombre}
@@ -55,26 +64,27 @@ export function InicioVenueCard({
             </View>
           ) : null}
           {detalles ? <Text style={styles.tipos}>{detalles}</Text> : null}
-        </View>
-      </Pressable>
-      <View style={styles.bodyHours}>
-        <Text style={styles.sub}>Horarios disponibles</Text>
-        <View style={styles.hours}>
-          {hours.map((h) => (
-            <Pressable
-              key={h.id}
-              onPress={() => onPressHour(h.id)}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={`Reservar ${formatHora(h.hora)}${h.precioLabel ? ` ${h.precioLabel}` : ""}`}
-              style={styles.hourHit}
-            >
-              <View style={styles.hour}>
-                <Text style={styles.hourT}>{formatHora(h.hora)}</Text>
-                {h.precioLabel ? <Text style={styles.priceT}>{h.precioLabel}</Text> : null}
-              </View>
-            </Pressable>
-          ))}
+        </Pressable>
+
+        <View style={styles.bodyHours}>
+          <Text style={styles.sub}>Horarios disponibles</Text>
+          <View style={styles.hours}>
+            {hours.map((h) => (
+              <Pressable
+                key={h.id}
+                onPress={() => onPressHour(h.id)}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={`Reservar ${formatHora(h.hora)}${h.precioLabel ? ` ${h.precioLabel}` : ""}`}
+                style={styles.hourHit}
+              >
+                <View style={styles.hour}>
+                  <Text style={styles.hourT}>{formatHora(h.hora)}</Text>
+                  {h.precioLabel ? <Text style={styles.priceT}>{h.precioLabel}</Text> : null}
+                </View>
+              </Pressable>
+            ))}
+          </View>
         </View>
       </View>
     </View>
@@ -83,6 +93,8 @@ export function InicioVenueCard({
 
 const styles = StyleSheet.create({
   card: {
+    flexDirection: "row",
+    alignItems: "stretch",
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -90,9 +102,17 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     minHeight: 118,
   },
-  mainHit: { flexDirection: "row" },
-  photo: { width: 92, minHeight: 92, backgroundColor: colors.navyDark },
-  bodyTop: { flex: 1, padding: space[12], gap: 4, paddingBottom: 4 },
+  photoHit: {
+    width: 104,
+    alignSelf: "stretch",
+  },
+  photo: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: colors.navyDark,
+  },
+  content: { flex: 1, minWidth: 0 },
+  bodyTop: { padding: space[12], gap: 4, paddingBottom: 4 },
   bodyHours: { paddingHorizontal: space[12], paddingBottom: space[12] },
   titleRow: {
     flexDirection: "row",
