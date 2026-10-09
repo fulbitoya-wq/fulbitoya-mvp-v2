@@ -10,7 +10,7 @@ import {
   formatHora,
   normalizarTipo,
 } from "../lib/desafios";
-import { addDaysLocal, hourSlots, toIsoDateLocal } from "../lib/fecha-ui";
+import { arIsoDate, hourSlots } from "../lib/fecha-ui";
 import { formatDistanciaKm, getUserLocation, haversineKm, type LatLng } from "../lib/geo";
 import { ChevronLeft, iconStroke } from "../lib/icons";
 import { listarTurnosPublicos, pesosReserva } from "../lib/reserva";
@@ -73,10 +73,7 @@ export function ReservarCanchaScreen({
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"lista" | "mapa">("lista");
 
-  const dias = useMemo(() => {
-    const today = new Date();
-    return Array.from({ length: 7 }, (_, i) => toIsoDateLocal(addDaysLocal(today, i)));
-  }, []);
+  const dias = useMemo(() => Array.from({ length: 7 }, (_, i) => arIsoDate(i)), []);
 
   const horas = useMemo(() => hourSlots().filter((h) => {
     const n = Number(h.slice(0, 2));
@@ -100,11 +97,9 @@ export function ReservarCanchaScreen({
     void (async () => {
       const loc = await getUserLocation();
       if (!live) return;
-      if (loc) {
-        setAnchor(loc);
-        setZona({ label: "Cerca mío", lat: loc.lat, lng: loc.lng, source: "gps" });
-        setHasZone(true);
-      }
+      // Solo ancla para ordenar. No forzar “Cerca mío”: desde Europa el GPS
+      // dejaba la lista ordenada a miles de km o vacía si pedían zona.
+      if (loc) setAnchor(loc);
       setBootLocDone(true);
     })();
     return () => {
@@ -116,11 +111,14 @@ export function ReservarCanchaScreen({
     if (zona) {
       setAnchor({ lat: zona.lat, lng: zona.lng });
       setHasZone(true);
+    } else {
+      setHasZone(false);
     }
   }, [zona]);
 
   const venues = useMemo((): VenueRow[] => {
-    if (!hasZone || !anchor) return [];
+    // Sin zona elegida igual listamos (ordenados por GPS si hay ancla).
+    if (!bootLocDone) return [];
     type Agg = {
       canchaId: string;
       nombre: string;
@@ -173,7 +171,9 @@ export function ReservarCanchaScreen({
       .filter((v) => v.hours.length > 0)
       .map((v) => {
         const km =
-          v.lat != null && v.lng != null ? haversineKm(anchor, { lat: v.lat, lng: v.lng }) : null;
+          anchor && v.lat != null && v.lng != null
+            ? haversineKm(anchor, { lat: v.lat, lng: v.lng })
+            : null;
         const tiposOrden = [...v.tipos].sort();
         const superf = [...v.superficies]
           .map(etiquetaSuperficie)
@@ -205,7 +205,7 @@ export function ReservarCanchaScreen({
         if (b.km != null) return 1;
         return a.nombre.localeCompare(b.nombre, "es");
       });
-  }, [turnos, fecha, hora, hasZone, anchor, dias]);
+  }, [turnos, fecha, hora, anchor, dias, bootLocDone]);
 
   const openTurno = (canchaId: string, turnoId: string) => {
     if (onReservarTurno) {
@@ -233,19 +233,21 @@ export function ReservarCanchaScreen({
       label: v.distancia ?? undefined,
     }));
 
-  const region = anchor
-    ? {
-        latitude: anchor.lat,
-        longitude: anchor.lng,
-        latitudeDelta: 0.08,
-        longitudeDelta: 0.08,
-      }
-    : {
-        latitude: -34.6,
-        longitude: -58.45,
-        latitudeDelta: 0.2,
-        longitudeDelta: 0.2,
-      };
+  const region =
+    hasZone && anchor
+      ? {
+          latitude: anchor.lat,
+          longitude: anchor.lng,
+          latitudeDelta: 0.08,
+          longitudeDelta: 0.08,
+        }
+      : {
+          // Sin zona elegida: GBA, no el GPS del browser en Europa.
+          latitude: -34.6,
+          longitude: -58.45,
+          latitudeDelta: 0.2,
+          longitudeDelta: 0.2,
+        };
 
   return (
     <View style={[styles.fill, { paddingTop: Math.max(insets.top, space[8]) }]}>
@@ -308,15 +310,11 @@ export function ReservarCanchaScreen({
         {loading || !bootLocDone ? <Mute>Cargando canchas…</Mute> : null}
         {error ? <Mute>{error}</Mute> : null}
 
-        {!loading && bootLocDone && !hasZone ? (
-          <EmptyState
-            title="Buscá una zona para ver las canchas disponibles"
-            body="Activá tu ubicación o elegí una ciudad / barrio arriba."
-            action={<Button label="Usar mi ubicación" onPress={() => void pedirUbicacion()} />}
-          />
+        {!loading && bootLocDone && !hasZone && venues.length > 0 ? (
+          <Mute>Mostrando todas. Elegí una zona (ej. Monte Grande) para ordenar por cercanía.</Mute>
         ) : null}
 
-        {hasZone && mode === "mapa" ? (
+        {mode === "mapa" && bootLocDone ? (
           <CanchaMap
             style={styles.map}
             region={region}
@@ -325,11 +323,20 @@ export function ReservarCanchaScreen({
           />
         ) : null}
 
-        {hasZone && mode === "lista" ? (
+        {mode === "lista" && bootLocDone ? (
           venues.length === 0 && !loading ? (
             <EmptyState
-              title="No hay turnos con esos filtros"
-              body="Probá otro día u horario, o ampliá la zona."
+              title={hasZone ? "No hay turnos con esos filtros" : "No hay turnos"}
+              body={
+                hasZone
+                  ? "Probá otro día u horario, o elegí otra zona."
+                  : "Elegí una ciudad arriba o usá tu ubicación."
+              }
+              action={
+                hasZone ? undefined : (
+                  <Button label="Usar mi ubicación" onPress={() => void pedirUbicacion()} />
+                )
+              }
             />
           ) : (
             <View style={{ gap: space[12] }}>

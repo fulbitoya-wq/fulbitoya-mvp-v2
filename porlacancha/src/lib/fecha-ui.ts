@@ -1,5 +1,25 @@
 /** Fechas ISO (YYYY-MM-DD) y horas HH:MM en zona local, formato AR. */
 
+export const TZ_AR = "America/Argentina/Buenos_Aires";
+
+/** Día calendario en Argentina (YYYY-MM-DD), con offset opcional. */
+export function arIsoDate(offsetDays = 0): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ_AR,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const todayAr = fmt.format(new Date());
+  if (offsetDays === 0) return todayAr;
+  const [y, m, d] = todayAr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, (m ?? 1) - 1, (d ?? 1) + offsetDays));
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
 export function toIsoDateLocal(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");

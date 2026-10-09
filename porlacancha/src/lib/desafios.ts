@@ -1,3 +1,4 @@
+import { arIsoDate } from "./fecha-ui";
 import { supabase } from "./supabase";
 
 export type Desafio = {
@@ -49,8 +50,9 @@ export async function getDesafiosPublicos(): Promise<{
   data: Desafio[];
   error: string | null;
 }> {
-  // Local calendar date (AR), not UTC — toISOString flips the day after ~21:00 ART.
-  const today = localIsoDate(0);
+  // Calendario Argentina: si el celular está en Europa, el "hoy" local
+  // ya es mañana y escondía todos los partidos del día en AR.
+  const today = arIsoDate(0);
   const { data, error } = await supabase
     .from("desafios")
     .select(
@@ -184,26 +186,18 @@ export function formatHora(hora: string): string {
 }
 
 export function esHoy(isoDate: string): boolean {
-  return isoDate === localIsoDate(0);
+  return isoDate === arIsoDate(0);
 }
 
 export function esManana(isoDate: string): boolean {
-  return isoDate === localIsoDate(1);
+  return isoDate === arIsoDate(1);
 }
 
 export function esFinde(isoDate: string): boolean {
   const [y, m, d] = isoDate.split("-").map(Number);
-  const day = new Date(y, (m ?? 1) - 1, d ?? 1).getDay();
+  // Día de semana del calendario civil (sin zona): fecha de partido es YYYY-MM-DD AR.
+  const day = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1)).getUTCDay();
   return day === 0 || day === 6;
-}
-
-function localIsoDate(offsetDays: number): string {
-  const dt = new Date();
-  dt.setDate(dt.getDate() + offsetDays);
-  const y = dt.getFullYear();
-  const m = String(dt.getMonth() + 1).padStart(2, "0");
-  const d = String(dt.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
 }
 
 export function formatDiaSemana(isoDate: string): string {
