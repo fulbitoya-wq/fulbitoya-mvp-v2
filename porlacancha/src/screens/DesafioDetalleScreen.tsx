@@ -19,13 +19,9 @@ import {
 } from "../lib/desafios";
 import { cancelarInscripcion } from "../lib/inscripciones";
 import {
-  boolFlag,
   confirmarPagoPrueba,
-  condicionesDeDesafio,
-  decidirSinRival,
   inscribirJugadorAmistoso,
   montoAPagar,
-  opcionesSinRival,
   pesos,
 } from "../lib/plc";
 import { ChevronLeft, MapPin, Share2, iconStroke } from "../lib/icons";
@@ -77,17 +73,12 @@ export function DesafioDetalleScreen({
   const lat = Number(desafio.lat);
   const lng = Number(desafio.lng);
 
-  const [cond, setCond] = useState<Record<string, unknown> | null>(null);
-  const [opc, setOpc] = useState<Record<string, unknown> | null>(null);
   const [pago, setPago] = useState<{ total: number; cancha: number; servicio: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [needIdentidad, setNeedIdentidad] = useState(false);
   const porLaCancha = desafio.modalidad === "por_la_cancha";
 
   const load = async () => {
-    const [c, o] = await Promise.all([condicionesDeDesafio(desafio.id), opcionesSinRival(desafio.id)]);
-    if (c.ok) setCond(c.cond);
-    if (o.ok) setOpc(o.opc);
     if (inscripcionId && estadoInscripcion === "pendiente_pago") {
       const m = await montoAPagar(inscripcionId);
       if (m.ok) setPago({ total: m.montoTotal, cancha: m.montoCancha, servicio: m.montoServicio });
@@ -235,31 +226,6 @@ export function DesafioDetalleScreen({
     onPaid?.();
   };
 
-  const decidir = (opcion: string, riesgo = false) => {
-    const run = () => {
-      void decidirSinRival(desafio.id, opcion, riesgo).then((res) => {
-        if (!res.ok) {
-          showNotice("No se pudo guardar", res.error);
-          return;
-        }
-        showNotice("Listo", "Quedó registrada tu decisión.");
-        onPaid?.();
-        void load();
-      });
-    };
-    if (opcion === "quedarme" || opcion === "seguir_inicio") {
-      showConfirm({
-        title: "Confirmar",
-        body: typeof opc?.texto_riesgo === "string" ? opc.texto_riesgo : "Si nadie se suma, se cobra la cancha completa.",
-        cancelLabel: "Volver",
-        confirmLabel: "Confirmo",
-        onConfirm: () => run(),
-      });
-      return;
-    }
-    run();
-  };
-
   const stickyLabel =
     mostrarPago && pago
       ? pesos(pago.total)
@@ -347,52 +313,6 @@ export function DesafioDetalleScreen({
           ))}
           {(desafio.inscritos?.length ?? 0) < (desafio.cupos || 2) ? (
             <Mute>{amistoso ? "Falta gente o un rival." : "Buscando rival."}</Mute>
-          ) : null}
-
-          <Text style={styles.h2}>Condiciones</Text>
-          {cond ? (
-            <>
-              <Mute>{typeof cond.mensaje_tramo === "string" ? cond.mensaje_tramo : ""}</Mute>
-              <Mute>Cancha {pesos(cond.precio_cancha)}</Mute>
-              <Mute>
-                Tu lado {pesos(cond.monto_equipo_a)} · rival {pesos(cond.monto_rival_equipo)}
-              </Mute>
-              {amistoso ? <Mute>Jugador suelto {pesos(cond.monto_rival_jugador)}</Mute> : null}
-              <Mute>Sin rival se retiene {pesos(cond.sena_sin_rival)}.</Mute>
-            </>
-          ) : (
-            <Mute>Cargando condiciones…</Mute>
-          )}
-
-          {opc && boolFlag(opc, "puede_cancelar_gratis") ? (
-            <View style={{ marginTop: space[12] }}>
-              <Button label="Cancelar sin cargo" variant="secondary" onPress={() => decidir("cancelar_gratis")} />
-            </View>
-          ) : null}
-          {opc && boolFlag(opc, "puede_seguir_cierre") ? (
-            <View style={{ marginTop: space[8] }}>
-              <Button label="Seguir buscando hasta el cierre" variant="secondary" onPress={() => decidir("seguir_cierre")} />
-            </View>
-          ) : null}
-          {opc && boolFlag(opc, "puede_seguir_inicio") ? (
-            <View style={{ marginTop: space[8] }}>
-              <Button label="Seguir hasta el inicio" variant="secondary" onPress={() => decidir("seguir_inicio", true)} />
-            </View>
-          ) : null}
-          {opc && boolFlag(opc, "puede_quedarme") ? (
-            <View style={{ marginTop: space[8] }}>
-              <Button label="Quedarme con la cancha" variant="secondary" onPress={() => decidir("quedarme", true)} />
-            </View>
-          ) : null}
-          {opc && boolFlag(opc, "puede_liberar") ? (
-            <View style={{ marginTop: space[8] }}>
-              <Button label="Liberar turno (seña)" variant="secondary" onPress={() => decidir("liberar")} />
-            </View>
-          ) : null}
-          {opc && boolFlag(opc, "puede_conservar") ? (
-            <View style={{ marginTop: space[8] }}>
-              <Button label="Conservar el turno" variant="secondary" onPress={() => decidir("conservar")} />
-            </View>
           ) : null}
 
           <Text style={styles.h2}>¿Cómo funciona?</Text>
