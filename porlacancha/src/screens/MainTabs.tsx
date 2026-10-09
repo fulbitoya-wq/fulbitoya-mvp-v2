@@ -664,6 +664,11 @@ export function MainTabs({ onRequestAuth }: Props) {
               const ids = equipos.map((e) => e.id);
               void getInscripcionMia(detalle.id, ids, profile?.id).then(setMia);
             }}
+            onCancelled={() => {
+              setDetalle(null);
+              setMia(null);
+              void refreshDesafios();
+            }}
           />
         ) : reservaDetalle ? (
           <ReservaDetalleScreen
@@ -688,7 +693,7 @@ export function MainTabs({ onRequestAuth }: Props) {
           <ReservaListaScreen reservaId={listaReservaId} onBack={() => setListaReservaId(null)} />
         ) : calendarOpen ? (
           <View style={styles.body}>
-            <View style={{ paddingTop: 48, paddingHorizontal: 8 }}>
+            <View style={styles.calHeader}>
               <IconBtn onPress={() => setCalendarOpen(false)} label="Volver">
                 <ChevronLeft color={colors.gold} size={22} strokeWidth={iconStroke} />
               </IconBtn>
@@ -791,6 +796,10 @@ export function MainTabs({ onRequestAuth }: Props) {
               setExploreView("hub");
             }}
             onRequestAuth={onRequestAuth}
+            onOpenPredio={(canchaId) => {
+              setReservePrefill({ canchaId });
+              setExploreView("predio");
+            }}
             initialCanchaId={reservePrefill?.canchaId ?? null}
             initialTurnoId={reservePrefill?.turnoId ?? null}
             initialTipoCobro={reservePrefill?.tipoCobro ?? null}
@@ -960,4 +969,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   body: { flex: 1 },
+  calHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    paddingTop: 48,
+    paddingHorizontal: 8,
+  },
 });

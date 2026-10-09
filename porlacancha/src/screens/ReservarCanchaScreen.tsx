@@ -27,6 +27,7 @@ type Props = {
   onBack: () => void;
   onRequestAuth: () => void;
   onDone: () => void;
+  onOpenPredio?: (canchaId: string) => void;
   initialCanchaId?: string | null;
   initialTurnoId?: string | null;
   initialTipoCobro?: TipoCobro | null;
@@ -45,6 +46,7 @@ export function ReservarCanchaScreen({
   onBack,
   onRequestAuth,
   onDone,
+  onOpenPredio,
   initialCanchaId = null,
   initialTurnoId = null,
   initialTipoCobro = null,
@@ -222,6 +224,10 @@ export function ReservarCanchaScreen({
           <Pressable
             key={p.id}
             onPress={() => {
+              if (onOpenPredio) {
+                onOpenPredio(p.id);
+                return;
+              }
               setCanchaId(p.id);
               setFecha(null);
               setTurnoId(null);
@@ -234,7 +240,8 @@ export function ReservarCanchaScreen({
           </Pressable>
         ))}
 
-        {canchaId ? (
+        {/* Horarios inline solo si ya venimos con predio preseleccionado (deep link / volver del predio). */}
+        {canchaId && !onOpenPredio ? (
           <>
             <Text style={[styles.h, { marginTop: space[16] }]}>Día</Text>
             <View style={styles.wrap}>

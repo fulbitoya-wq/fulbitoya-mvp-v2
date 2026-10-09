@@ -54,9 +54,11 @@ export function puedeEditarConvocados(p: MiPartido): boolean {
 
 export function puedeCancelarInscripcion(p: MiPartido): boolean {
   if (p.miRol !== "capitan") return false;
+  if (!p.inscripcionId) return false;
   if (p.inscripcionEstado !== "confirmada" && p.inscripcionEstado !== "pendiente_pago") return false;
   if (p.estado === "cancelado" || p.estado === "finalizado") return false;
-  return Date.now() < inicioMs(p.fecha, p.hora_inicio) - 24 * 3_600_000;
+  // UI: cancelar hasta el inicio. El RPC aplica plazos / reglas de reembolso.
+  return Date.now() < inicioMs(p.fecha, p.hora_inicio);
 }
 
 export async function listMisPartidos(): Promise<{ ok: true; items: MiPartido[] } | { ok: false; error: string }> {
